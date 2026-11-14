@@ -25,10 +25,13 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
 ## Status (2026-11-14)
 - Done: Debian + Blender 4.3.2 + python3-requests installed; blender-mcp 2.0.0 venv at `/opt/blender-mcp`;
   `blender` MCP server registered in Claude Code (user scope, shows Connected); Termux:X11 app installed.
-- To do: first live test. User runs `bash ~/blender-live/start-blender.sh`, then starts a **new** Claude
-  session (MCP tools load at session start) and asks for something simple, e.g. a cube.
-- 2026-11-14: Termux:X11 app said "Not connected" because no X server was running (start-blender.sh
-  hadn't been run / had exited). The app only connects while `termux-x11 :0` runs; start-blender.sh starts it.
-- Not yet known: whether Blender's UI runs well enough on llvmpipe in X11, and whether the add-on's
-  auto-start opens port 9876.
+- 2026-11-14: First live test works. Blender 4.3.2 GUI runs in Termux:X11 on llvmpipe, the add-on opens
+  port 9876, and Claude's `blender` MCP tools reach it (get_scene_info returned the default cube scene).
+- Fix that made it work: Blender died with SIGILL because llvmpipe's LLVM read "CPU part 0xd81" (Cortex-A720)
+  from /proc/cpuinfo and emitted SVE code (`ptrue p0.s`), and this phone has SVE off (no `sve` in Features).
+  `start-blender.sh` now writes `cpuinfo-nosve` (CPU part → 0xd41, Cortex-A78; gitignored) and binds it over
+  /proc/cpuinfo in Debian. The Mesa shader cache had stored SVE code, so I deleted
+  `/root/.cache/mesa_shader_cache*`. Do that again if SIGILL comes back.
+- "Not connected" in the X11 app only means no `termux-x11 :0` server is running; start-blender.sh starts it.
+- Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.

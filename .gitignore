@@ -2,3 +2,4 @@ addon.py
 models/
 install.log
 *.blend1
+cpuinfo-nosve

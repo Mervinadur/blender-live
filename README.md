@@ -17,3 +17,10 @@ You say what to change ("make the handle 20% thicker"), Claude edits the model, 
 - Renders on the CPU for now (software OpenGL), so heavy scenes are slow.
 - Blender makes meshes. For exact parametric parts for Inventor (STEP), use CAD Agent.
 - The add-on's online model services (Hyper3D, Tripo, Sketchfab, …) stay off.
+
+## Troubleshooting
+- **X11 app says "Not connected"**: the X server isn't running. Run `bash ~/blender-live/start-blender.sh`.
+- **Blender quits with "Illegal instruction"**: the start script already works around this (it hides the
+  phone's CPU type from the software renderer). If it comes back, run
+  `proot-distro login debian -- rm -rf /root/.cache/mesa_shader_cache /root/.cache/mesa_shader_cache_db`
+  and start again.
