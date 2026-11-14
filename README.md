@@ -1,0 +1,19 @@
+# Blender Live
+
+Blender running on the phone (Termux → Debian proot), shown live in the **Termux:X11** app,
+and driven by Claude Code through the [blender-mcp](https://github.com/ahujasid/blender-mcp) add-on.
+You say what to change ("make the handle 20% thicker"), Claude edits the model, and you watch it happen.
+
+## Setup (once)
+1. Install the **Termux:X11** app (APK: `termux-x11-universal-debug.apk` from the termux/termux-x11 GitHub nightly release).
+2. In Termux: `bash ~/blender-live/setup.sh`
+
+## Use
+1. `bash ~/blender-live/start-blender.sh`, which opens Termux:X11 with Blender.
+2. Put models in `~/blender-live/models/` (share them into Termux, then ask Claude to move them).
+3. Ask Claude Code for edits. Export STL/OBJ/glTF back to `models/`.
+
+## Limits
+- Renders on the CPU for now (software OpenGL), so heavy scenes are slow.
+- Blender makes meshes. For exact parametric parts for Inventor (STEP), use CAD Agent.
+- The add-on's online model services (Hyper3D, Tripo, Sketchfab, …) stay off.
