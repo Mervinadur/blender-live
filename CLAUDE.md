@@ -4,7 +4,7 @@
 Blender (Debian trixie package, in `proot-distro` Debian) shown in the Termux:X11 app. The blender-mcp
 add-on (`addon.py`, fetched by `setup.sh`, pinned commit, gitignored) runs a socket server on
 localhost:9876 (auto-start defaults on). Claude Code talks to it via the `blender` MCP server
-(user scope: `proot-distro login debian -- /opt/blender-mcp/bin/blender-mcp`, a venv with
+(user scope: `proot-distro login debian -- env DISABLE_TELEMETRY=true … /opt/blender-mcp/bin/blender-mcp`, a venv with
 blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux binary, so not used).
 
 ## Files
@@ -17,6 +17,9 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
 ## Rules
 - The add-on's generation integrations (Hyper3D/Rodin, Tripo, Meshy, World Labs, Sketchfab) stay **off**.
   This follows the spirit of the user's generation ban; ask before enabling any.
+- Keep telemetry **off**: the MCP server sends usage events (and can upload screenshots/code) to its author's
+  Supabase unless `DISABLE_TELEMETRY` etc. are set; the add-on's `telemetry_consent` pref defaults off. Leave it off.
+- `claude mcp ...` must run from `~` (it fails elsewhere with "preload not found ./.local/share/claude/setdns.js").
 - I can't see the X11 window. Verify through MCP scene info / dimensions, or render previews to `models/`.
 
 ## Status (2026-11-14)
