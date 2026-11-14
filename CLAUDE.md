@@ -27,6 +27,8 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   `blender` MCP server registered in Claude Code (user scope, shows Connected); Termux:X11 app installed.
 - To do: first live test. User runs `bash ~/blender-live/start-blender.sh`, then starts a **new** Claude
   session (MCP tools load at session start) and asks for something simple, e.g. a cube.
+- 2026-11-14: Termux:X11 app said "Not connected" because no X server was running (start-blender.sh
+  hadn't been run / had exited). The app only connects while `termux-x11 :0` runs; start-blender.sh starts it.
 - Not yet known: whether Blender's UI runs well enough on llvmpipe in X11, and whether the add-on's
   auto-start opens port 9876.
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
