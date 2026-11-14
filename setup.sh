@@ -8,7 +8,9 @@ ADDON_COMMIT=8f40787fbde8e6d8fe51c5a3553e5635fff40d2b   # ahujasid/blender-mcp (
 yes | pkg install -y x11-repo
 yes | pkg install -y termux-x11-nightly proot-distro
 [ -d "$PREFIX/var/lib/proot-distro/installed-rootfs/debian" ] || proot-distro install debian
-proot-distro login debian -- bash -c 'apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y blender python3-requests mesa-utils curl ca-certificates && (command -v uvx || curl -LsSf https://astral.sh/uv/install.sh | sh)'
+proot-distro login debian -- bash -c 'apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y blender python3-requests python3-venv mesa-utils curl ca-certificates && ([ -x /opt/blender-mcp/bin/blender-mcp ] || (python3 -m venv /opt/blender-mcp && /opt/blender-mcp/bin/pip install -q blender-mcp))'
+# Register the MCP server with Claude Code (venv inside Debian; Termux's uvx can't run there)
+claude mcp get blender >/dev/null 2>&1 || claude mcp add blender -s user -- proot-distro login debian -- /opt/blender-mcp/bin/blender-mcp
 
 curl -fsSL "https://raw.githubusercontent.com/ahujasid/blender-mcp/$ADDON_COMMIT/addon.py" -o "$DIR/addon.py"
 mkdir -p "$DIR/models"
