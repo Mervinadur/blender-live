@@ -4,7 +4,7 @@
 Blender (Debian trixie package, in `proot-distro` Debian) shown in the Termux:X11 app. The blender-mcp
 add-on (`addon.py`, fetched by `setup.sh`, pinned commit, gitignored) runs a socket server on
 localhost:9876 (auto-start defaults on). Claude Code talks to it via the `blender` MCP server
-(user scope: `proot-distro login debian -- env DISABLE_TELEMETRY=true … /opt/blender-mcp/bin/blender-mcp`, a venv with
+(user scope: `proot-distro login debian --shared-tmp -- env DISABLE_TELEMETRY=true … /opt/blender-mcp/bin/blender-mcp`, a venv with
 blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux binary, so not used).
 
 ## Files
@@ -33,5 +33,10 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   /proc/cpuinfo in Debian. The Mesa shader cache had stored SVE code, so I deleted
   `/root/.cache/mesa_shader_cache*`. Do that again if SIGILL comes back.
 - "Not connected" in the X11 app only means no `termux-x11 :0` server is running; start-blender.sh starts it.
+- 2026-11-14: The `look` tool needed two fixes. (1) It needs numpy inside Blender's Python, so I installed
+  `python3-numpy` in Debian (also added to setup.sh). (2) Blender runs with `--shared-tmp` (Termux /tmp), but the MCP
+  server ran without it, so it couldn't find the screenshot in /tmp. I re-registered the MCP server with
+  `--shared-tmp` (and changed setup.sh to match). This takes effect from the next Claude session.
+- First model: a coffee mug (MugBody + MugHandle, life-size 8 cm × 9.5 cm, blue ceramic material), not saved to a file yet.
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
