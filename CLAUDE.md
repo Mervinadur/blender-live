@@ -13,6 +13,7 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
 - `start-blender.sh`: starts termux-x11 :0, opens the app, runs Blender with `--python addon.py`.
   Binds `models/` → `/root/models` inside Debian. Uses llvmpipe (software GL).
 - `models/`: the user's working files (gitignored).
+- `examples/`: finished models committed so the user can download them from GitHub (e.g. `coffee_mug.stl`).
 
 ## Rules
 - The add-on's generation integrations (Hyper3D/Rodin, Tripo, Meshy, World Labs, Sketchfab) stay **off**.
@@ -37,6 +38,11 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   `python3-numpy` in Debian (also added to setup.sh). (2) Blender runs with `--shared-tmp` (Termux /tmp), but the MCP
   server ran without it, so it couldn't find the screenshot in /tmp. I re-registered the MCP server with
   `--shared-tmp` (and changed setup.sh to match). This takes effect from the next Claude session.
-- First model: a coffee mug (MugBody + MugHandle, life-size 8 cm × 9.5 cm, blue ceramic material), not saved to a file yet.
+- First model: a coffee mug (MugBody + MugHandle, 80 mm body, 95.5 mm tall, 115 mm with handle, blue ceramic).
+  Saved as `models/coffee_mug.blend` + `models/coffee_mug.stl`, a copy in `~/downloads/coffee_mug.stl`, and committed
+  as `examples/coffee_mug.stl` (binary STL in **mm**: exported with global_scale=1000, body+handle joined, 2816 tris).
+  Termux can't write to the phone's Downloads (no All-files access), so the user gets files from GitHub.
+- STL export recipe: join evaluated meshes (the handle is a curve) into a temp object, then
+  `bpy.ops.wm.stl_export(export_selected_objects=True, global_scale=1000)` so the units are mm for Inventor.
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.

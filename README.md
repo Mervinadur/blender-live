@@ -24,3 +24,7 @@ You say what to change ("make the handle 20% thicker"), Claude edits the model, 
   phone's CPU type from the software renderer). If it comes back, run
   `proot-distro login debian -- rm -rf /root/.cache/mesa_shader_cache /root/.cache/mesa_shader_cache_db`
   and start again.
+
+## Examples
+- `examples/coffee_mug.stl`: a coffee mug made by Claude in Blender. Units are millimetres
+  (80 mm wide, 95.5 mm tall, 115 mm including the handle). Download it from GitHub: open the file and tap the download button.
