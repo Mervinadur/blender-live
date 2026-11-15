@@ -1,0 +1,27 @@
+name: Build pod image
+# Builds the RunPod render image (Blender + libs + sshd) and pushes it to GitHub's container registry.
+on:
+  push:
+    paths: ["pod-image/**", ".github/workflows/pod-image.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      BLENDER_VERSION: "4.3.2"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: pod-image
+          push: true
+          build-args: BLENDER_VERSION=${{ env.BLENDER_VERSION }}
+          tags: ghcr.io/mervinadur/blender-pod:${{ env.BLENDER_VERSION }}
