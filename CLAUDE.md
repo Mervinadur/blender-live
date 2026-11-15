@@ -59,6 +59,15 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
 - 2026-11-15: `examples/astronaut_walk.gif`: 1 s loop (one walk cycle), 12 fps, 480×480, 405 KB. Recipe: camera `GifCam`
   (ortho, rotation 54.7356°, 0, 45°, aimed at (0,0,0.95), ortho_scale 2.5, shift_y -0.06), Workbench with `color_type='TEXTURE'`,
   walk_Armature frames 0-22 step 2 → `models/astronaut_gif/`, then the same ffmpeg palette steps. GifCam + walk as active
-  action are in the open scene but **not saved** to `astronaut.blend` (user hasn't said).
+  action are in the open scene; not saved to `astronaut.blend`.
+- 2026-11-15: `examples/astronaut_moon.gif` (4 s loop, 12 fps, 400×400, 2.6 MB; 480 px was 3.6-7.5 MB because the scrolling
+  ground changes every frame). Scene saved as `models/astronaut_moon.blend` (copy; the open file is still astronaut.blend).
+  Action `moon_Armature` (0-96, fake user): frames 0-48 = walk at half speed + two 0.16 m hops (Armature object Z), 48-96 = one
+  0.85 m leap, legs ping-ponging walk frames 0→6→0; travel 1.2 + 1.6 = 2.8 m along −Y (forward is −Y). `MoonGround`: 14×18 m
+  numpy grid with craters tiled every 2.8 m along Y so the loop is seamless; GifCam keyed to follow Y (ortho_scale 3.4,
+  shift_y 0.10). Workbench shadows don't render here (llvmpipe?), so `BlobShadow` (3 stacked discs) is keyed under him and
+  shrinks with height. View transform set to Standard (AgX was too dark). Rendered 48 frames in ~80 s to `models/moon_gif/`.
+- Lesson: while I render, the user's view in Termux:X11 is live, and a touch rotated/moved selected objects mid-render. Set
+  `hide_select=True` on the scene objects during long renders (restore after), and check object transforms before rendering.
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
