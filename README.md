@@ -25,7 +25,9 @@ One-time setup:
    `chmod 600 ~/.config/runpod/api_key`.
 
 Use (or just ask Claude): `./render-remote.sh models/knight/knight_turntable.blend -a` renders all frames into
-`models/knight/remote_frames/`. Anything after the file goes to Blender (e.g. `-E CYCLES -s 1 -e 24 -a`, or `-f 1` for one still).
+`models/knight/remote_frames/`. `PODS=4 ./render-remote.sh … -a` splits the frames over 4 GPUs at once (about 4× faster,
+about the same total cost). The machines boot from a ready-made image with Blender 4.3.2 inside
+(`ghcr.io/mervinadur/blender-render:4.3.2`, built from `pod-image/` by GitHub Actions), so nothing is installed per job. Anything after the file goes to Blender (e.g. `-E CYCLES -s 1 -e 24 -a`, or `-f 1` for one still).
 It prints the time and rough cost at the end (the knight turntable, 120 frames, took under 2 minutes and about $0.03, against about 32 minutes on the phone). `./render-remote.sh --list` shows any machines still running,
 `--kill-all` deletes them. As a safety net, each machine deletes itself after 90 minutes.
 Your .blend (with its textures packed in) is uploaded to RunPod for the render.
@@ -43,6 +45,11 @@ Your .blend (with its textures packed in) is uploaded to RunPod for the render.
   and start again.
 
 ## Examples
+- **`examples/knight_turntable_v3.mp4`** (best quality): your knight rendered in Cycles (realistic light) at 1440×1800 (4:5 portrait),
+  one smooth 5-second turn at 24 fps. Fixed colours (clean red cape, steel boots and helmet, white skulls on the base, no red patch
+  on the arm) and smooth polished steel. `knight_turntable_v3.gif` is a smaller preview, `knight_v3_still.png` a full-size still.
+  Rendered on a rented RTX 3090 in 55 minutes for about $0.45. Rebuild: `knight_setup_scene.py` (now the v3 scene),
+  render with `render-remote.sh` and `PRE_PY=knight_v3_pod_render.py` (turns on the denoiser).
 - `examples/knight_turntable.gif`: a smooth 360° turntable of your knight model (from your STL), coloured in Blender: steel armour,
   red velvet cape, stone base, bone skulls and glowing flames, on a marble pedestal in a castle cellar (5-second loop, 600×600, 24 fps).
   Textures and lighting are CC0 from [Poly Haven](https://polyhaven.com). To rebuild it: `knight_fetch_assets.py` downloads the

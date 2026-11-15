@@ -1,7 +1,7 @@
 """Knight turntable scene for Blender 4.3 (Blender Live).
 
-Builds: the user's knight STL (Knight.stl, one solid mesh) coloured by region: dark steel armour
-(Poly Haven metal_plate maps), red velvet cape (velour_velvet), stone base (monastery_stone_floor),
+Builds: the user's knight STL (Knight.stl, one solid mesh) coloured by region: polished plate steel
+(procedural, v3), red velvet cape (velour_velvet), stone base (monastery_stone_floor),
 bone skulls and glowing flames. It stands on a rotating marble pedestal (marble_01) on a monastery
 stone floor, lit by the castle_zavelstein_cellar HDRI. Animates one seamless, constant-speed 360 degree turn.
 
@@ -18,6 +18,7 @@ from mathutils import Vector
 ASSETS = os.environ.get("KNIGHT_ASSETS", "/root/models/knight/assets")
 FRAMES = 120          # one full turn = 120 frames (5 s at 24 fps)
 FPS = 24
+RES = (1440, 1800)    # v3: 4:5 portrait (tall knight, fills a phone screen)
 
 
 # ---------------------------------------------------------------- helpers
@@ -281,21 +282,72 @@ STL = os.environ.get("KNIGHT_STL", "/root/models/knight/Knight.stl")
 SKULL_C, SKULL_R = Vector((0.1818, -0.1183, 0.8603)), 0.06   # least-squares fit of the held skull
 
 
-def stl_regions(c, nr):
-    """Per-face region: 0 armour, 1 cape, 2 base, 3 bone, 4 flame (c = face centres, nr = normals)."""
+# v3 colouring: split the surface into patches at creases > 12 degrees (the cape is one clean patch),
+# then colour patches by rules; skulls on the base and the feet are found by position (top-down view).
+CREASE_ANG = 12.0
+SKULL_BOXES = [(-0.225, -0.135, -0.135, 0.01),    # front-left skull
+               (-0.035, 0.09, -0.2, 0.035)]       # front-centre skull (lying, cranium to the back)
+BOOT_BOXES = [(-0.15, -0.03, -0.215, 0.015), (0.07, 0.26, -0.135, 0.075)]   # feet, top-down view
+
+
+def faces_and_patches(me):
     import numpy as np
-    x, y, z = c.T
-    d = np.linalg.norm(c - np.array(SKULL_C), axis=1)
-    reg = np.zeros(len(c), int)
-    cape = ((y > 0.02) & (z < 0.88)) | ((y > -0.02) & (z >= 0.88)) | \
-           ((np.abs(x) > 0.18) & (z < 0.62) & (y > -0.12))
-    cape &= ~((x > 0.09) & (z > 0.58) & (y < 0.07))           # raised right arm stays armour
-    reg[cape] = 1
-    reg[(z < 0.085) | ((z < 0.14) & (nr[:, 2] > 0.9))] = 2    # base disc + flat tops of its slabs
-    hand = (x > 0.1) & (z > 0.75)
-    reg[hand & (d <= SKULL_R + 0.004)] = 3                    # held skull
+    nf = len(me.polygons)
+    g = lambda a, k: (lambda b: (me.polygons.foreach_get(a, b), b)[1])(np.empty(nf*k, int if a == "vertices" else float))
+    nrm, cen, tri = g("normal", 3).reshape(-1,3), g("center", 3).reshape(-1,3), g("vertices", 3).reshape(-1,3)
+    e = np.concatenate([tri[:,[0,1]], tri[:,[1,2]], tri[:,[2,0]]]); e.sort(1)
+    f = np.tile(np.arange(nf), 3); o = np.lexsort((e[:,1], e[:,0])); e, f = e[o], f[o]
+    same = (e[1:] == e[:-1]).all(1); pairs = np.stack([f[:-1][same], f[1:][same]], 1)
+    smooth = pairs[(nrm[pairs[:,0]] * nrm[pairs[:,1]]).sum(1) > math.cos(math.radians(CREASE_ANG))]
+    lab = np.arange(nf)
+    while True:
+        m = np.minimum(lab[smooth[:,0]], lab[smooth[:,1]]); old = lab.copy()
+        np.minimum.at(lab, smooth[:,0], m); np.minimum.at(lab, smooth[:,1], m); lab = lab[lab]
+        if (lab == old).all(): break
+    return nrm, cen, pairs, np.unique(lab, return_inverse=True)[1]
+
+
+def stl_regions(nrm, cen, pairs, patch):
+    import numpy as np
+    """0 armour, 1 cape, 2 base, 3 bone, 4 flame; -1 = undecided (filled from neighbours)."""
+    x, y, z = cen.T
+    cnt = np.bincount(patch); size = cnt[patch]
+    pz_max = np.zeros(len(cnt)); np.maximum.at(pz_max, patch, z)
+    reg = np.full(len(cen), -1)
+    big = size >= 300                                                  # small patches = detail, decided later
+    reg[big] = 0
+    reg[patch == np.argmax(cnt)] = 1                                   # the cape (one big cloth patch)
+    boots = np.zeros(len(cen), bool)
+    for (x0, x1, y0, y1) in BOOT_BOXES:
+        boots |= (x > x0) & (x < x1) & (y > y0) & (y < y1)
+    pboot = np.bincount(patch, boots) / cnt                            # share of a patch inside a boot box
+    reg[big & (pz_max[patch] < 0.17) & (pboot[patch] < 0.5)] = 2       # base disc + slabs (not the feet)
+    reg[z < 0.065] = 2
+    # held skull + flames (exact geometry rules from v2)
+    d = np.linalg.norm(cen - np.array(SKULL_C), axis=1); hand = (x > 0.1) & (z > 0.75)
+    reg[hand & (d <= SKULL_R + 0.004)] = 3
     reg[hand & (d > SKULL_R + 0.004) & (z > SKULL_C.z + 0.015) & (d < SKULL_R + 0.09)] = 4
-    reg[(x > -0.02) & (x < 0.085) & (y > -0.2) & (y < -0.03) & (z > 0.088) & (z < 0.16)] = 3
+    # skulls on the base (fused into the slabs, so found by position: top-down view, STL coords)
+    for (x0, x1, y0, y1) in SKULL_BOXES:
+        box = (x > x0) & (x < x1) & (y > y0) & (y < y1) & (z > 0.085) & (z < 0.25) & (reg != 1)
+        flat = box & (np.abs(nrm[:, 2]) > 0.98)
+        top = np.median(z[flat & (z < 0.17)]) if (flat & (z < 0.17)).any() else 0.13
+        reg[box & (z > top + 0.003)] = 3
+        print("skull box", (x0, x1, y0, y1), "slab top", round(float(top), 3), "faces", int((box & (z > top + 0.003)).sum()))
+    # fill the rest by neighbour majority
+    for _ in range(200):
+        und = reg < 0
+        if not und.any(): break
+        a, b = pairs[:,0], pairs[:,1]
+        votes = np.zeros((len(reg), 5))
+        for s, t in ((a, b), (b, a)):
+            ok = (reg[s] < 0) & (reg[t] >= 0)
+            np.add.at(votes, (s[ok], reg[t[ok]]), 1)
+        has = und & (votes.sum(1) > 0)
+        reg[has] = votes[has].argmax(1)
+    reg[reg < 0] = 0
+    # stray armour-coloured slivers on the slabs (away from the boots) -> stone
+    reg[(reg == 0) & (z < 0.17) & ~boots & (size < 300)] = 2
     return reg
 
 
@@ -331,6 +383,39 @@ def flame_material():
     return mat
 
 
+def steel_material():
+    """Polished plate armour: metallic, roughness varied by wear noise, faint hammered bump, no tiling pattern."""
+    mat = bpy.data.materials.new("PlateSteel")
+    mat.use_nodes = True
+    nt = mat.node_tree
+    nodes, links = nt.nodes, nt.links
+    bsdf = node(nodes, "BSDF_PRINCIPLED")
+    bsdf.inputs["Base Color"].default_value = (0.56, 0.57, 0.6, 1)
+    bsdf.inputs["Metallic"].default_value = 1.0
+    mat.diffuse_color = (0.56, 0.57, 0.6, 1)
+    coord = nodes.new("ShaderNodeTexCoord")
+    wear = nodes.new("ShaderNodeTexNoise")                # large soft patches: polished vs dull
+    wear.inputs["Scale"].default_value = 6.0
+    wear.inputs["Detail"].default_value = 6.0
+    links.new(coord.outputs["Object"], wear.inputs["Vector"])
+    ramp = nodes.new("ShaderNodeMapRange")
+    ramp.inputs["From Min"].default_value = 0.35
+    ramp.inputs["From Max"].default_value = 0.65
+    ramp.inputs["To Min"].default_value = 0.18
+    ramp.inputs["To Max"].default_value = 0.36
+    links.new(wear.outputs["Fac"], ramp.inputs["Value"])
+    links.new(ramp.outputs["Result"], bsdf.inputs["Roughness"])
+    dents = nodes.new("ShaderNodeTexNoise")               # fine hammered surface
+    dents.inputs["Scale"].default_value = 90.0
+    dents.inputs["Detail"].default_value = 2.0
+    links.new(coord.outputs["Object"], dents.inputs["Vector"])
+    bump = nodes.new("ShaderNodeBump")
+    bump.inputs["Strength"].default_value = 0.04
+    links.new(dents.outputs["Fac"], bump.inputs["Height"])
+    links.new(bump.outputs["Normal"], bsdf.inputs["Normal"])
+    return mat
+
+
 def build_stl_knight(turntable):
     import numpy as np
     before = set(bpy.data.objects)
@@ -338,15 +423,9 @@ def build_stl_knight(turntable):
     ob = next(o for o in bpy.data.objects if o not in before)
     ob.name = "Knight"
     me = ob.data
-    n = len(me.polygons)
-    c = np.empty(n * 3)
-    me.polygons.foreach_get("center", c)
-    nr = np.empty(n * 3)
-    me.polygons.foreach_get("normal", nr)
-    reg = stl_regions(c.reshape(-1, 3), nr.reshape(-1, 3))
+    reg = stl_regions(*faces_and_patches(me))
 
-    steel = pbr_material("DarkSteel", "metal_plate", "2k", scale=5.0, box=True, metallic=1.0,
-                         base_color=(0.42, 0.43, 0.46), rough_mul=0.65, normal_strength=0.3)
+    steel = steel_material()      # v3: smooth plate steel (metal_plate maps showed a diamond tread pattern)
     cape = pbr_material("RedVelvet", "velour_velvet", "1k", scale=6.0, box=True, metallic=0.0,
                         tint=(0.55, 0.03, 0.04))
     base = pbr_material("BaseStone", "monastery_stone_floor", "2k", scale=2.5, box=True,
@@ -406,13 +485,13 @@ def setup_glow_compositor():
 
 def setup_camera_lights():
     cam_data = bpy.data.cameras.new("TurntableCam")
-    cam_data.lens = 80
+    cam_data.lens = 76                      # v3: a little wider for the 4:5 frame
     cam = bpy.data.objects.new("TurntableCam", cam_data)
     bpy.context.collection.objects.link(cam)
     cam.location = (0, -6.4, 1.9)
     target = bpy.data.objects.new("CamTarget", None)
     bpy.context.collection.objects.link(target)
-    target.location = (0, 0, 1.14)
+    target.location = (0, 0, 1.08)          # v3: lower, so the pedestal edge clears the frame
     track = cam.constraints.new("TRACK_TO")
     track.target = target
     track.track_axis = "TRACK_NEGATIVE_Z"
@@ -455,21 +534,44 @@ def animate_turntable(turntable):
 
 
 def setup_render():
+    """v3 default: Cycles production settings, 4:5 portrait (1440x1800), rendered on a rented GPU via
+    render-remote.sh. KNIGHT_ENGINE=EEVEE gives the old fast phone preview (720x720)."""
     scene = bpy.context.scene
-    scene.render.resolution_x = 720
-    scene.render.resolution_y = 720
     scene.render.resolution_percentage = 100
     scene.render.film_transparent = False
     scene.view_settings.view_transform = "AgX"
     scene.view_settings.look = "AgX - Medium High Contrast"
-    try:
-        scene.render.engine = "BLENDER_EEVEE_NEXT"     # Cycles here has no denoiser
-    except TypeError as e:
-        print("EEVEE Next not available:", e)
-    else:
-        scene.eevee.taa_render_samples = 16            # ~19 s/frame at 720 px on llvmpipe
     scene.render.image_settings.file_format = "PNG"
-    scene.render.filepath = "/root/models/knight/frames/f_"
+    scene.render.image_settings.color_depth = "8"
+    if os.environ.get("KNIGHT_ENGINE", "CYCLES").upper() == "EEVEE":
+        scene.render.resolution_x = scene.render.resolution_y = 720
+        scene.render.engine = "BLENDER_EEVEE_NEXT"
+        scene.eevee.taa_render_samples = 16            # ~19 s/frame at 720 px on llvmpipe
+        scene.render.filepath = "/root/models/knight/frames/f_"
+        return
+    scene.render.resolution_x, scene.render.resolution_y = RES
+    scene.render.engine = "CYCLES"
+    cy = scene.cycles
+    cy.device = "GPU"
+    cy.samples = 1024                    # upper limit; adaptive sampling stops early where clean
+    cy.use_adaptive_sampling = True
+    cy.adaptive_threshold = 0.008
+    cy.adaptive_min_samples = 64
+    cy.use_denoising = True              # denoiser itself is chosen on the GPU machine (v3/pod_render.py)
+    cy.max_bounces = 12
+    cy.diffuse_bounces = 4
+    cy.glossy_bounces = 8                # polished steel reflecting itself
+    cy.transmission_bounces = 8
+    cy.transparent_max_bounces = 16
+    cy.sample_clamp_indirect = 10.0      # no fireflies from the flames on steel
+    cy.caustics_reflective = False
+    cy.caustics_refractive = False
+    cy.blur_glossy = 0.5
+    cy.film_exposure = 1.0
+    scene.render.use_motion_blur = True  # slight blur on the turning edge, like a real camera
+    scene.render.motion_blur_shutter = 0.5
+    scene.render.filter_size = 1.5
+    scene.render.filepath = "/root/models/knight/frames_v3/f_"
 
 
 def main():

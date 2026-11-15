@@ -12,10 +12,11 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   MCP registration, add-on).
 - `start-blender.sh`: starts termux-x11 :0, opens the app, runs Blender with `--python addon.py`.
   Binds `models/` → `/root/models` inside Debian. Uses llvmpipe (software GL).
-- `render-remote.sh`: renders a .blend on a RunPod GPU (REST API v2, one GPU type per create call so the script loops 4090/3090/A5000 × COMMUNITY/SECURE, `ubuntu:24.04` image, start command installs sshd +
+- `render-remote.sh`: renders a .blend on RunPod GPUs (`PODS=N` in parallel, ready-made image, see Status; REST API v2, one GPU type per create call so the script loops 4090/3090/A5000 × COMMUNITY/SECURE, `ubuntu:24.04` image, start command installs sshd +
   official Blender x64 tarball; Cycles set to OptiX/CUDA via `gpu.py`), pulls frames to `<model>/remote_frames/`, deletes the pod
   on exit + a self-delete timer on the pod (MAX_MINUTES=90). Key in `~/.config/runpod/api_key` (user puts it there, never me);
   SSH key `~/.ssh/runpod_ed25519`. Packs assets locally first (4.3), so 5.x files need `PACK=0 BLENDER_VERSION=5.2.2`.
+- `pod-image/`: Dockerfile + start.sh for the RunPod image (Blender 4.3.2, libs, sshd, ffmpeg); built by `.github/workflows/pod-image.yml`.
 - `models/`: the user's working files (gitignored), **one folder per model** (`models/<model-name>/`: .blend, source files,
   render frames, tests). Currently `coffee-mug/`, `astronaut/`, `man-rigged/`, `knight/`. New model → new folder. Inside Debian: `/root/models/<model-name>/`.
 - `examples/`: finished models committed so the user can download them from GitHub (e.g. `coffee_mug.stl`).
@@ -110,16 +111,24 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   Headless EEVEE works on the pod (no EGL errors). Frames in `models/knight/remote_frames/`, match the phone's `frames/`
   (side-by-side check of frame 31). Log: `models/knight/remote.log`. COMMUNITY had no 4090 again → SECURE $0.89/h.
   Next (user's plan): build on this once happy, e.g. a pre-built image with Blender baked in, or Serverless.
-- 2026-11-15: **Knight v3 in progress** (user: Cycles, best resolution/aspect, fix colours, show as V3 in examples).
-  Colours: `setup_scene.py` `stl_regions` rewritten: crease patches (faces split at >12 deg, the cape is one 98k-face patch),
-  base = big low patches, feet kept armour (BOOT_BOXES), base skulls by position (SKULL_BOXES, from a top-down view), held skull
-  + flames as before. Helmet is all steel (no separate hood in the mesh). Armour = procedural `steel_material()` (the metal_plate
-  maps showed a diamond tread pattern at 1440 px). Render: Cycles, 1440x1800 (4:5), 1024 max samples adaptive 0.008, lens 76,
-  target z 1.08, motion blur; denoiser set on the pod by `models/knight/v3/pod_render.py` (phone Blender has no denoisers;
-  `render-remote.sh` got `PRE_PY=`). Scene: `models/knight/knight_v3.blend` (built by `models/knight/v3/build.py`).
-  Test frame: 15 s/frame render + 2.5 min one-time OptiX kernel compile per pod. Full render launched 11:45 →
-  `models/knight/frames_v3/`, log `models/knight/v3/full.log`. Still to do: mp4 + gif + still into `examples/` as v3, README.
-  Pipeline problems seen (user wants to optimise after seeing v3): some pods install for 10+ min or upload at ~5 KB/s
-  (added 5 min scp timeout); ideas: pre-built image with Blender, CUDA instead of OptiX (no kernel compile).
+- 2026-11-15: **Knight v3 done** (user asked: Cycles, best resolution/aspect, fixed colours, V3 in examples, production quality).
+  `examples/knight_turntable_v3.mp4` (1440x1800, 24 fps, 120 frames, x264 crf 17, 5 MB), `knight_turntable_v3.gif` (480x600, 12 MB),
+  `knight_v3_still.png` (frame 1). Frames in `models/knight/frames_v3/` (433 MB, phone only). Rendered on RTX 3090 SECURE
+  (4090s sold out): 24 s/frame after a 3 min first frame (OptiX kernel compile), 54.5 min, ~$0.45.
+  Colours: `setup_scene.py` `stl_regions` = crease patches (faces split at >12 deg; the cape is one 98k-face patch), base = big low
+  patches, feet kept armour (BOOT_BOXES), base skulls by position (SKULL_BOXES, from a top-down view), held skull + flames as v2.
+  Helmet all steel (the mesh has no separate hood). Armour = procedural `steel_material()` (metal_plate maps showed a diamond tread
+  pattern at 1440 px). Render: Cycles 1024 max samples, adaptive 0.008, clamp indirect 10, motion blur, lens 76, target z 1.08;
+  denoiser (OIDN, GPU) set on the pod by `examples/knight_v3_pod_render.py` via `PRE_PY` (phone Blender has no denoisers).
+  Scene `models/knight/knight_v3.blend`, built by `models/knight/v3/build.py`; debug scripts/renders in `models/knight/v3/`.
+- 2026-11-15: **render-remote.sh v2** (user: split jobs over pods + ready-made image; machine choice and tuning stay with Claude
+  per session, no auto-picker; Blender stays 4.3.2 = phone version; man-rigged/5.x dropped for now).
+  `PODS=N` splits `-a` (or `-s/-e -a`) into N contiguous chunks, one pod each, in parallel (per-chunk logs, progress every 30 s,
+  total cost summed, failed chunks reported). Default IMAGE `ghcr.io/mervinadur/blender-render:4.3.2` (public; `pod-image/`
+  Dockerfile + start.sh, built by `.github/workflows/pod-image.yml` on push). `IMAGE=ubuntu:24.04` = old install-on-boot path.
+  Upload timeout 5 min. Dry-run tested only (fake key: 3 chunks 1-20/21-40/41-60, clean failure). **Not yet run for real** with
+  the image or with PODS>1; first test planned: coffee mug, PODS=2. Old private package `blender-pod` is unused (user may delete).
+  Repo made **PUBLIC** by the user 2026-11-15 (audit: no secrets in history; commit email visible, user OK with it).
+  Ideas not done: CUDA instead of OptiX for short jobs (skips ~3 min compile), mp4 encode on the pod, auto-retry of slow pods.
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
