@@ -26,6 +26,7 @@ You say what to change ("make the handle 20% thicker"), Claude edits the model, 
   and start again.
 
 ## Examples
+- `examples/astronaut_walk.gif`: the rigged astronaut walking, a 1-second looping isometric animation (480×480, 12 fps).
 - `examples/coffee_mug_colours.gif`: 5-second looping isometric animation of the mug changing through 5 colours.
 - `examples/coffee_mug.stl`: a coffee mug made by Claude in Blender. Units are millimetres
   (80 mm wide, 95.5 mm tall, 115 mm including the handle). Download it from GitHub: open the file and tap the download button.
