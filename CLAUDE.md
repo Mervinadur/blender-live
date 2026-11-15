@@ -155,5 +155,11 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   Known weakness: the crane-up ending (frames ~1250-1440) ends close on the cliff face rather than an open reveal; fix = aim the
   target higher / stop the camera further back in `build.py` camera section, re-render 1200-1440 only.
   The fixed `nature_trail.blend` is open in the live X11 Blender.
+- 2026-11-15: **Realistic nature trail** `examples/nature_trail_realistic.mp4` (60 s, 1280x720, 63 MB), made in the
+  image-and-gif-generator repo (user lifted the Replicate ban for this one job): 7 keyframes every 10 s of nature_trail.mp4 →
+  FLUX Kontext Pro photoreal (`outputs/nature-trail-real/nt-key-*.jpg`) → 6 × 11 s Seedance 1 Lite i2v (first+last frame mode
+  was rejected upstream with a task_type error) → 1 s crossfades in ffmpeg. Known flaws: some segments show a hand with a
+  phone gimbal, legs or feet despite "no people" in the prompt; the path layout drifts from the Blender original.
+  Cost ≈ $2.7 (Seedance returned 1920x1088 although 720p was asked; if billed as 1080p it is ≈ $5). **Waiting on the user:** watch it.
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
