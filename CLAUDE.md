@@ -110,5 +110,16 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   Headless EEVEE works on the pod (no EGL errors). Frames in `models/knight/remote_frames/`, match the phone's `frames/`
   (side-by-side check of frame 31). Log: `models/knight/remote.log`. COMMUNITY had no 4090 again → SECURE $0.89/h.
   Next (user's plan): build on this once happy, e.g. a pre-built image with Blender baked in, or Serverless.
+- 2026-11-15: **Knight v3 in progress** (user: Cycles, best resolution/aspect, fix colours, show as V3 in examples).
+  Colours: `setup_scene.py` `stl_regions` rewritten: crease patches (faces split at >12 deg, the cape is one 98k-face patch),
+  base = big low patches, feet kept armour (BOOT_BOXES), base skulls by position (SKULL_BOXES, from a top-down view), held skull
+  + flames as before. Helmet is all steel (no separate hood in the mesh). Armour = procedural `steel_material()` (the metal_plate
+  maps showed a diamond tread pattern at 1440 px). Render: Cycles, 1440x1800 (4:5), 1024 max samples adaptive 0.008, lens 76,
+  target z 1.08, motion blur; denoiser set on the pod by `models/knight/v3/pod_render.py` (phone Blender has no denoisers;
+  `render-remote.sh` got `PRE_PY=`). Scene: `models/knight/knight_v3.blend` (built by `models/knight/v3/build.py`).
+  Test frame: 15 s/frame render + 2.5 min one-time OptiX kernel compile per pod. Full render launched 11:45 →
+  `models/knight/frames_v3/`, log `models/knight/v3/full.log`. Still to do: mp4 + gif + still into `examples/` as v3, README.
+  Pipeline problems seen (user wants to optimise after seeing v3): some pods install for 10+ min or upload at ~5 KB/s
+  (added 5 min scp timeout); ideas: pre-built image with Blender, CUDA instead of OptiX (no kernel compile).
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.

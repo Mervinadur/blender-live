@@ -13,11 +13,12 @@
 #
 # Settings (env): RUNPOD_API_KEY or ~/.config/runpod/api_key; GPU (default RTX 4090, falls back);
 # BLENDER_VERSION (default 4.3.2, matches the phone; 5.x works but can't be packed here, so PACK=0);
-# PACK=0 to upload the file as is; CLOUD=SECURE to skip Community Cloud; MAX_MINUTES.
+# PACK=0 to upload the file as is; CLOUD=SECURE to skip Community Cloud; MAX_MINUTES;
+# PRE_PY=script.py runs that script on the pod before rendering (after the GPU setup).
 set -euo pipefail
 DIR="$HOME/blender-live"
 API="https://api.runpod.io/v2"   # REST v2: new scoped keys (Pods R/W) only work here, not on v1
-case "${1:-}" in ""|-h|--help) sed -n '2,17p' "$0"; exit;; esac
+case "${1:-}" in ""|-h|--help) sed -n '2,18p' "$0"; exit;; esac
 KEY="${RUNPOD_API_KEY:-$(cat "$HOME/.config/runpod/api_key" 2>/dev/null || true)}"
 [ -n "$KEY" ] || { echo "No API key. Put it in ~/.config/runpod/api_key (chmod 600)."; exit 1; }
 api() { curl -sS -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" "$@"; }
@@ -119,7 +120,8 @@ for i in $(seq 1 120); do rsh true 2>/dev/null && break; [ "$i" = 120 ] && { ech
 rsh "nohup bash -c 'sleep $((MAX_MINUTES*60)); curl -s -X DELETE -H \"Authorization: Bearer $KEY\" $API/pods/$POD' >/dev/null 2>&1 &"
 
 echo "== Uploading"
-scp "${SSHO[@]}" -P "$PORT" "$UPLOAD" "root@$IP:/root/job/scene.blend"
+timeout 300 scp "${SSHO[@]}" -P "$PORT" "$UPLOAD" "root@$IP:/root/job/scene.blend" \
+  || { echo "!! Upload failed or took over 5 min (slow machine); try again for a new one"; exit 1; }
 echo "== Waiting for Blender install"
 for i in $(seq 1 120); do rsh test -f /root/ready && break; [ "$i" = 120 ] && { echo "!! Blender install took over 10 min"; exit 1; }; sleep 5; done
 
@@ -136,10 +138,12 @@ for d in p.devices: d.use = d.type != "CPU"
 for s in bpy.data.scenes: s.cycles.device = "GPU"
 print("GPU devices:", [(d.name, d.type) for d in p.devices if d.use])'
 printf '%s\n' "$GPUPY" | rsh "cat > /root/job/gpu.py"
+PRE=""   # optional extra script run on the pod before rendering (e.g. the denoiser, which the phone's Blender lacks)
+if [ -n "${PRE_PY:-}" ]; then rsh "cat > /root/job/pre.py" < "$PRE_PY"; PRE="--python pre.py"; fi
 
 ARGS=""; for a in "$@"; do ARGS+=" $(printf '%q' "$a")"; done
 echo "== Rendering: blender -b scene.blend$ARGS"
-rsh "cd /root/job && mkdir -p out && /opt/blender/blender -b scene.blend --python gpu.py -o /root/job/out/frame_#### $ARGS" 2>&1 \
+rsh "cd /root/job && mkdir -p out && /opt/blender/blender -b scene.blend --python gpu.py $PRE -o /root/job/out/frame_#### $ARGS" 2>&1 \
   | grep --line-buffered -E "GPU devices|Saved:|Error|error|Fra:[0-9]+ .*(Rendering|Sample) [0-9]+ / |Time:" || true
 
 echo "== Downloading frames to $OUT_DIR"
