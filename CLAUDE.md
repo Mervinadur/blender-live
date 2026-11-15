@@ -12,7 +12,7 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   MCP registration, add-on).
 - `start-blender.sh`: starts termux-x11 :0, opens the app, runs Blender with `--python addon.py`.
   Binds `models/` → `/root/models` inside Debian. Uses llvmpipe (software GL).
-- `render-remote.sh`: renders a .blend on a RunPod GPU (REST API v1, `ubuntu:24.04` image, start command installs sshd +
+- `render-remote.sh`: renders a .blend on a RunPod GPU (REST API v2, one GPU type per create call so the script loops 4090/3090/A5000 × COMMUNITY/SECURE, `ubuntu:24.04` image, start command installs sshd +
   official Blender x64 tarball; Cycles set to OptiX/CUDA via `gpu.py`), pulls frames to `<model>/remote_frames/`, deletes the pod
   on exit + a self-delete timer on the pod (MAX_MINUTES=90). Key in `~/.config/runpod/api_key` (user puts it there, never me);
   SSH key `~/.ssh/runpod_ed25519`. Packs assets locally first (4.3), so 5.x files need `PACK=0 BLENDER_VERSION=5.2.2`.
@@ -99,11 +99,12 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   `examples/knight_turntable.gif` 600 px, 11 MB; scripts copied to `examples/`. Known flaw: the lowered left forearm/gauntlet
   (|x|>0.18, z<0.62 rule) gets a red cape patch in side views; told the user, fix = exclude that arm box from `cape` and re-render (~35 min).
   Note: one headless run ran at 64 s/frame (55 s before sampling), a re-run alone was 17 s; don't render in the live Blender at the same time.
-- 2026-11-15: RunPod remote rendering (user's choice over other providers): `render-remote.sh` written. Tested locally only:
-  syntax, asset packing (coffee_mug.blend → 116K copy), and the API-error path with a fake key (HTTP 401, no pod created).
-  **Never run against a real pod yet.** Waiting on the user: RunPod account + credit + API key in `~/.config/runpod/api_key`.
-  First real run should be a cheap one (`coffee_mug.blend -f 1`) and check `--list` afterwards. Unverified guesses to watch on
-  that run: GPU type id strings, OptiX inside plain ubuntu (needs NVIDIA_DRIVER_CAPABILITIES=all), the Blender lib list,
-  and headless EEVEE on the pod. The pod's watchdog command line contains the API key (only visible inside that pod).
+- 2026-11-15: RunPod remote rendering **works** (`render-remote.sh`). First real run: `coffee_mug.blend -f 1`, 1m29s total,
+  ~$0.02, RTX 4090 SECURE at $0.89/h (COMMUNITY had no 4090s), pod deleted, `--list` empty after. Blender 4.3.2 on the pod sees the
+  4090 as CUDA + OPTIX. Not yet tested: a Cycles or EEVEE render there (the mug scene is Workbench), and a long multi-frame job.
+  Lessons: new scoped RunPod keys only work on **REST v2** (`https://api.runpod.io/v2`); v1 (`rest.runpod.io/v1`) returns 401 for
+  them. Scopes are fixed when a key is created (ticking boxes later in "Edit" does nothing). The key needs REST API → Pods R/W.
+  The user saves the key with nano in a second Termux session; I check it by fingerprint/mtime, never print it.
+  Next (user's plan): build on this once happy, e.g. a pre-built image with Blender baked in, or Serverless.
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.

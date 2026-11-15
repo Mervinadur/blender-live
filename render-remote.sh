@@ -16,15 +16,15 @@
 # PACK=0 to upload the file as is; CLOUD=SECURE to skip Community Cloud; MAX_MINUTES.
 set -euo pipefail
 DIR="$HOME/blender-live"
-API="https://rest.runpod.io/v1"
+API="https://api.runpod.io/v2"   # REST v2: new scoped keys (Pods R/W) only work here, not on v1
 case "${1:-}" in ""|-h|--help) sed -n '2,17p' "$0"; exit;; esac
 KEY="${RUNPOD_API_KEY:-$(cat "$HOME/.config/runpod/api_key" 2>/dev/null || true)}"
 [ -n "$KEY" ] || { echo "No API key. Put it in ~/.config/runpod/api_key (chmod 600)."; exit 1; }
 api() { curl -sS -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" "$@"; }
 
 case "${1:-}" in
-  --list) api "$API/pods" | jq -r '.[] | "\(.id)  \(.name)  \(.desiredStatus)  $\(.costPerHr)/h"'; exit;;
-  --kill-all) for id in $(api "$API/pods" | jq -r '.[].id'); do api -X DELETE "$API/pods/$id" >/dev/null; echo "deleted $id"; done; exit;;
+  --list) api "$API/pods" | jq -r '.pods[] | "\(.id)  \(.name)  \(.status)  $\(.cost)/h"'; exit;;
+  --kill-all) for id in $(api "$API/pods" | jq -r '.pods[].id'); do api -X DELETE "$API/pods/$id" >/dev/null; echo "deleted $id"; done; exit;;
 esac
 
 BLEND="$(realpath "$1")"; shift
@@ -64,15 +64,13 @@ apt-get install -yq libx11-6 libxi6 libxxf86vm1 libxfixes3 libxrender1 libxext6 
 mkdir -p /opt/blender; curl -sL "https://download.blender.org/release/Blender$BMAJ/blender-$BV-linux-x64.tar.xz" | tar -xJ -C /opt/blender --strip-components=1
 touch /root/ready; sleep infinity'
 
-create_pod() { # $1 = cloud type
-  jq -n --arg name "render-$NAME" --arg gpu "$GPU" --arg cloud "$1" --arg start "$START" \
+create_pod() { # $1 = cloud type, $2 = GPU type id (v2 takes one GPU type per pod)
+  jq -n --arg name "render-$NAME" --arg gpu "$2" --arg cloud "$1" --arg start "$START" \
     --arg pk "$(cat "$SSHKEY.pub")" --arg bv "$BV" --arg bmaj "$BMAJ" '{
-    name: $name, imageName: "ubuntu:24.04", computeType: "GPU", gpuCount: 1,
-    gpuTypeIds: ([$gpu, "NVIDIA GeForce RTX 4090", "NVIDIA GeForce RTX 3090", "NVIDIA RTX A5000"] | unique),
-    gpuTypePriority: "custom", cloudType: $cloud, supportPublicIp: true,
-    containerDiskInGb: 30, volumeInGb: 0, ports: ["22/tcp"],
+    name: $name, image: "ubuntu:24.04", gpu: {id: $gpu, count: 1}, cloud: $cloud,
+    disk: 30, ports: ["22/tcp"],
     env: {PUBLIC_KEY: $pk, BV: $bv, BMAJ: $bmaj, NVIDIA_DRIVER_CAPABILITIES: "all"},
-    dockerStartCmd: ["bash", "-c", $start]}' | api -w '\nHTTP %{http_code}' -X POST "$API/pods" -d @-
+    cmd: ["bash", "-c", $start]}' | api -w '\nHTTP %{http_code}' -X POST "$API/pods" -d @-
 }
 
 POD=""
@@ -90,27 +88,32 @@ trap cleanup EXIT
 trap 'exit 130' INT TERM
 
 echo "== Creating pod ($GPU, Blender $BV)"
-for CLOUD in ${CLOUD:-COMMUNITY SECURE}; do
-  RESP="$(create_pod "$CLOUD")"; CODE="$(tail -1 <<<"$RESP")"; RESP="$(sed '$d' <<<"$RESP")"
-  POD="$(jq -r '.id // empty' <<<"$RESP" 2>/dev/null || true)"
-  [ -n "$POD" ] && break
-  echo "   $CLOUD failed ($CODE): $(head -c 300 <<<"$RESP")"
-  case "$CODE" in *401*|*403*) echo "   (API key rejected)"; exit 1;; esac
+for TRY_GPU in "$GPU" "NVIDIA GeForce RTX 4090" "NVIDIA GeForce RTX 3090" "NVIDIA RTX A5000"; do
+  for CLOUD in ${CLOUD:-COMMUNITY SECURE}; do
+    RESP="$(create_pod "$CLOUD" "$TRY_GPU")"; CODE="$(tail -1 <<<"$RESP")"; RESP="$(sed '$d' <<<"$RESP")"
+    POD="$(jq -r '.id // empty' <<<"$RESP" 2>/dev/null || true)"
+    [ -n "$POD" ] && break 2
+    echo "   $TRY_GPU / $CLOUD failed ($CODE): $(jq -r '.detail // .title // .' <<<"$RESP" 2>/dev/null | head -c 300)"
+    case "$CODE" in *401*) echo "   (API key rejected)"; exit 1;; *403*) echo "   (key lacks Pods Read/Write)"; exit 1;; esac
+  done
 done
 [ -n "$POD" ] || { echo "!! No pod created"; exit 1; }
-T0=$(date +%s); RATE="$(jq -r '.costPerHr // empty' <<<"$RESP")"
-echo "   pod $POD ($CLOUD, \$${RATE:-?}/h)"
+T0=$(date +%s); RATE="$(jq -r '.cost // empty' <<<"$RESP")"
+echo "   pod $POD ($TRY_GPU, $CLOUD, \$${RATE:-?}/h)"
 
 echo "== Waiting for SSH"
 for i in $(seq 1 120); do
-  P="$(api "$API/pods/$POD")"; IP="$(jq -r '.publicIp // empty' <<<"$P")"; PORT="$(jq -r '.portMappings["22"] // empty' <<<"$P")"
+  P="$(api "$API/pods/$POD")"; ST="$(jq -r '.status // empty' <<<"$P")"
+  [ "$ST" = ERROR ] && { echo "!! Pod status ERROR"; exit 1; }
+  IP="$(jq -r 'if .status == "RUNNING" then .ssh.direct.host // empty else empty end' <<<"$P")"
+  PORT="$(jq -r 'if .status == "RUNNING" then .ssh.direct.port // empty else empty end' <<<"$P")"
   [ -n "$IP" ] && [ -n "$PORT" ] && break; sleep 5
 done
 [ -n "${IP:-}" ] && [ -n "${PORT:-}" ] || { echo "!! Pod never got a public SSH port"; exit 1; }
-[ -n "$RATE" ] || RATE="$(jq -r '.costPerHr // empty' <<<"$P")"
+[ -n "$RATE" ] || RATE="$(jq -r '.cost // empty' <<<"$P")"
 SSHO=(-i "$SSHKEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=10 -o ServerAliveInterval=30)
 rsh() { ssh "${SSHO[@]}" -p "$PORT" "root@$IP" "$@"; }
-until rsh true 2>/dev/null; do sleep 5; done
+for i in $(seq 1 120); do rsh true 2>/dev/null && break; [ "$i" = 120 ] && { echo "!! SSH never answered"; exit 1; }; sleep 5; done
 
 # Watchdog on the pod: deletes itself after MAX_MINUTES even if this phone loses the connection.
 rsh "nohup bash -c 'sleep $((MAX_MINUTES*60)); curl -s -X DELETE -H \"Authorization: Bearer $KEY\" $API/pods/$POD' >/dev/null 2>&1 &"
@@ -118,7 +121,7 @@ rsh "nohup bash -c 'sleep $((MAX_MINUTES*60)); curl -s -X DELETE -H \"Authorizat
 echo "== Uploading"
 scp "${SSHO[@]}" -P "$PORT" "$UPLOAD" "root@$IP:/root/job/scene.blend"
 echo "== Waiting for Blender install"
-until rsh test -f /root/ready; do sleep 5; done
+for i in $(seq 1 120); do rsh test -f /root/ready && break; [ "$i" = 120 ] && { echo "!! Blender install took over 10 min"; exit 1; }; sleep 5; done
 
 # GPU setup: OptiX if it works, else CUDA; every non-CPU device on; Cycles scenes set to GPU.
 GPUPY='import bpy

@@ -19,13 +19,14 @@ renders there, downloads the frames, and deletes the machine again.
 
 One-time setup:
 1. Make an account on runpod.io and add some credit (e.g. $10).
-2. Settings → API Keys → create a key.
+2. Settings → API Keys → **Create API Key**, and tick REST API → **Pods: Read + Write** before tapping Create
+   (permissions can't be changed afterwards).
 3. In Termux: `mkdir -p ~/.config/runpod && nano ~/.config/runpod/api_key` (paste the key, save), then
    `chmod 600 ~/.config/runpod/api_key`.
 
 Use (or just ask Claude): `./render-remote.sh models/knight/knight_turntable.blend -a` renders all frames into
 `models/knight/remote_frames/`. Anything after the file goes to Blender (e.g. `-E CYCLES -s 1 -e 24 -a`, or `-f 1` for one still).
-It prints the time and rough cost at the end. `./render-remote.sh --list` shows any machines still running,
+It prints the time and rough cost at the end (the first test, one coffee-mug frame, took 1.5 minutes and cost about $0.02). `./render-remote.sh --list` shows any machines still running,
 `--kill-all` deletes them. As a safety net, each machine deletes itself after 90 minutes.
 Your .blend (with its textures packed in) is uploaded to RunPod for the render.
 
