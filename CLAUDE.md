@@ -160,6 +160,9 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   FLUX Kontext Pro photoreal (`outputs/nature-trail-real/nt-key-*.jpg`) → 6 × 11 s Seedance 1 Lite i2v (first+last frame mode
   was rejected upstream with a task_type error) → 1 s crossfades in ffmpeg. Known flaws: some segments show a hand with a
   phone gimbal, legs or feet despite "no people" in the prompt; the path layout drifts from the Blender original.
-  Cost ≈ $2.7 (Seedance returned 1920x1088 although 720p was asked; if billed as 1080p it is ≈ $5). **Waiting on the user:** watch it.
+  Cost ≈ $2.7 (Seedance returned 1920x1088 although 720p was asked; if billed as 1080p it is ≈ $5).
+  **User verdict 2026-11-15: failure.** 11 clips from 6 keyframes don't feel like one continuous walk, and $2.4+ for 1 min vs
+  cents for everything else is too much. Replicate ban is back on. Next: a non-Replicate route (proposed: photoreal Cycles
+  re-render of the same scene on RunPod). **Waiting on the user's pick.**
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
