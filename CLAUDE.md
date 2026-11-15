@@ -13,7 +13,7 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
 - `start-blender.sh`: starts termux-x11 :0, opens the app, runs Blender with `--python addon.py`.
   Binds `models/` → `/root/models` inside Debian. Uses llvmpipe (software GL).
 - `models/`: the user's working files (gitignored), **one folder per model** (`models/<model-name>/`: .blend, source files,
-  render frames, tests). Currently `coffee-mug/`, `astronaut/`, `man-rigged/`. New model → new folder. Inside Debian: `/root/models/<model-name>/`.
+  render frames, tests). Currently `coffee-mug/`, `astronaut/`, `man-rigged/`, `knight/`. New model → new folder. Inside Debian: `/root/models/<model-name>/`.
 - `examples/`: finished models committed so the user can download them from GitHub (e.g. `coffee_mug.stl`).
 
 ## Rules
@@ -76,5 +76,6 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   Don't shorten the bones (changing tails changes rest orientation and breaks the actions). Saved into both astronaut .blend files.
 - 2026-11-15: `models/` sorted into per-model folders (user chose phone-only; `examples/` on GitHub unchanged,
   .blend files not committed). `models/start.log` is the Blender log from my launch command.
+- 2026-11-15: Created empty `models/knight/` (new model folder, user's request); Blender relaunched with the default scene. Nothing modelled yet: waiting on what the user wants the knight to be.
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
