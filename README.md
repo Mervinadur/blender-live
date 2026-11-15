@@ -13,8 +13,24 @@ You say what to change ("make the handle 20% thicker"), Claude edits the model, 
 2. Put models in `~/blender-live/models/`, one folder per model (e.g. `models/astronaut/`). Share them into Termux, then ask Claude to move them.
 3. Ask Claude Code for edits. Exports go back into that model's folder.
 
+## Fast renders on a rented GPU (RunPod)
+The phone renders on its CPU, so big renders are slow. `render-remote.sh` rents an RTX 4090 on RunPod by the second,
+renders there, downloads the frames, and deletes the machine again.
+
+One-time setup:
+1. Make an account on runpod.io and add some credit (e.g. $10).
+2. Settings → API Keys → create a key.
+3. In Termux: `mkdir -p ~/.config/runpod && nano ~/.config/runpod/api_key` (paste the key, save), then
+   `chmod 600 ~/.config/runpod/api_key`.
+
+Use (or just ask Claude): `./render-remote.sh models/knight/knight_turntable.blend -a` renders all frames into
+`models/knight/remote_frames/`. Anything after the file goes to Blender (e.g. `-E CYCLES -s 1 -e 24 -a`, or `-f 1` for one still).
+It prints the time and rough cost at the end. `./render-remote.sh --list` shows any machines still running,
+`--kill-all` deletes them. As a safety net, each machine deletes itself after 90 minutes.
+Your .blend (with its textures packed in) is uploaded to RunPod for the render.
+
 ## Limits
-- Renders on the CPU for now (software OpenGL), so heavy scenes are slow.
+- Renders on the phone use the CPU (software OpenGL), so heavy scenes are slow; see RunPod above.
 - Blender makes meshes. For exact parametric parts for Inventor (STEP), use CAD Agent.
 - The add-on's online model services (Hyper3D, Tripo, Sketchfab, …) stay off.
 
