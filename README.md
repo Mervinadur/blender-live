@@ -10,8 +10,8 @@ You say what to change ("make the handle 20% thicker"), Claude edits the model, 
 
 ## Use
 1. `bash ~/blender-live/start-blender.sh`, which opens Termux:X11 with Blender.
-2. Put models in `~/blender-live/models/` (share them into Termux, then ask Claude to move them).
-3. Ask Claude Code for edits. Export STL/OBJ/glTF back to `models/`.
+2. Put models in `~/blender-live/models/`, one folder per model (e.g. `models/astronaut/`). Share them into Termux, then ask Claude to move them.
+3. Ask Claude Code for edits. Exports go back into that model's folder.
 
 ## Limits
 - Renders on the CPU for now (software OpenGL), so heavy scenes are slow.
