@@ -1,11 +1,11 @@
 """Knight turntable scene for Blender 4.3 (Blender Live).
 
-Builds: Poly Haven chess knight (marble statue) + an armoured knight made from primitives
-(Poly Haven metal_plate / velour_velvet textures, real Poly Haven kite shield and estoc),
-both on a rotating marble pedestal on a monastery stone floor, lit by the
-castle_zavelstein_cellar HDRI. Animates one seamless, constant-speed 360 degree turn.
+Builds: the user's knight STL (Knight.stl, one solid mesh) coloured by region: dark steel armour
+(Poly Haven metal_plate maps), red velvet cape (velour_velvet), stone base (monastery_stone_floor),
+bone skulls and glowing flames. It stands on a rotating marble pedestal (marble_01) on a monastery
+stone floor, lit by the castle_zavelstein_cellar HDRI. Animates one seamless, constant-speed 360 degree turn.
 
-Assets: run fetch_assets.py first (puts them in ./assets).
+Assets: run fetch_assets.py first (puts them in ./assets). STL path: KNIGHT_STL or /root/models/knight/Knight.stl.
 Run in Blender:  exec(open("/root/models/knight/setup_scene.py").read())
 or from a shell:  blender --python setup_scene.py
 """
@@ -264,117 +264,155 @@ def setup_floor_and_pedestal():
 
     turntable = bpy.data.objects.new("Turntable", None)
     turntable.empty_display_type = "CIRCLE"
-    turntable.empty_display_size = 1.35
+    turntable.empty_display_size = 1.0
     bpy.context.collection.objects.link(turntable)
 
     marble = pbr_material("Marble", "marble_01", "2k", scale=0.8, box=True)
     prim("cyl", "PedestalBase", (0, 0, 0.06), mat=marble, parent=None, subsurf=0, bevel=0.02,
-         radius=1.32, depth=0.12, vertices=96)
+         radius=0.98, depth=0.12, vertices=96)
     prim("cyl", "PedestalTop", (0, 0, 0.21), mat=marble, parent=turntable, subsurf=0,
-         bevel=0.025, radius=1.2, depth=0.18, vertices=96)
+         bevel=0.025, radius=0.86, depth=0.18, vertices=96)
     bpy.data.objects["PedestalBase"].hide_select = True
     return turntable
 
 
-def build_chess_knight(turntable):
-    objs = import_gltf("chess_set")
-    knight = single_mesh(objs, "piece_knight_white_01")
-    knight.name = "ChessKnight"
-    fit(knight, height=1.55)
-    knight.rotation_euler.z = math.radians(-90)   # horse faces the camera at frame 1 (checked in a test render)
-    knight.location = (0.58, 0.05, 0.30)
-    knight.parent = turntable
-    return knight
+STL = os.environ.get("KNIGHT_STL", "/root/models/knight/Knight.stl")
+# Colour regions, in the STL's own coordinates (1.015 tall, z up, faces -Y, raised hand on +X).
+SKULL_C, SKULL_R = Vector((0.1818, -0.1183, 0.8603)), 0.06   # least-squares fit of the held skull
 
 
-def build_armoured_knight(turntable):
-    root = bpy.data.objects.new("ArmouredKnight", None)
-    bpy.context.collection.objects.link(root)
+def stl_regions(c, nr):
+    """Per-face region: 0 armour, 1 cape, 2 base, 3 bone, 4 flame (c = face centres, nr = normals)."""
+    import numpy as np
+    x, y, z = c.T
+    d = np.linalg.norm(c - np.array(SKULL_C), axis=1)
+    reg = np.zeros(len(c), int)
+    cape = ((y > 0.02) & (z < 0.88)) | ((y > -0.02) & (z >= 0.88)) | \
+           ((np.abs(x) > 0.18) & (z < 0.62) & (y > -0.12))
+    cape &= ~((x > 0.09) & (z > 0.58) & (y < 0.07))           # raised right arm stays armour
+    reg[cape] = 1
+    reg[(z < 0.085) | ((z < 0.14) & (nr[:, 2] > 0.9))] = 2    # base disc + flat tops of its slabs
+    hand = (x > 0.1) & (z > 0.75)
+    reg[hand & (d <= SKULL_R + 0.004)] = 3                    # held skull
+    reg[hand & (d > SKULL_R + 0.004) & (z > SKULL_C.z + 0.015) & (d < SKULL_R + 0.09)] = 4
+    reg[(x > -0.02) & (x < 0.085) & (y > -0.2) & (y < -0.03) & (z > 0.088) & (z < 0.16)] = 3
+    return reg
 
-    steel = pbr_material("Steel", "metal_plate", "2k", scale=3.0, box=True, metallic=1.0,
-                         base_color=(0.8, 0.81, 0.83), rough_mul=0.7, normal_strength=0.4)
-    velvet = pbr_material("RedVelvet", "velour_velvet", "1k", scale=4.0, box=True, metallic=0.0,
-                          tint=(0.75, 0.06, 0.05))
-    gold = flat_material("Gold", (1.0, 0.72, 0.3), metallic=1.0, roughness=0.3)
-    leather = flat_material("Leather", (0.12, 0.06, 0.03), roughness=0.6)
-    dark = flat_material("VisorDark", (0.01, 0.01, 0.01), roughness=0.9)
 
-    for sx, side in ((1, "L"), (-1, "R")):
-        x = 0.11 * sx
-        prim("cube", f"Sabaton.{side}", (x, -0.05, 0.05), (0.06, 0.13, 0.045), mat=steel,
-             parent=root, bevel=0.02)
-        limb(f"Greave.{side}", (x, 0, 0.08), (x, 0, 0.5), 0.055, 0.072, steel, root)
-        prim("sphere", f"Knee.{side}", (x, -0.015, 0.53), (0.075, 0.07, 0.07), mat=steel, parent=root)
-        limb(f"Cuisse.{side}", (x, 0, 0.55), (x * 1.05, 0, 0.92), 0.075, 0.095, steel, root)
+def add_ao(mat, distance=0.04):
+    """Darken crevices: Base Color -> Ambient Occlusion -> Base Color (brings out the sculpt detail)."""
+    nt = mat.node_tree
+    bsdf = node(nt.nodes, "BSDF_PRINCIPLED")
+    ao = nt.nodes.new("ShaderNodeAmbientOcclusion")
+    ao.inputs["Distance"].default_value = distance
+    sock = bsdf.inputs["Base Color"]
+    if sock.is_linked:
+        nt.links.new(sock.links[0].from_socket, ao.inputs["Color"])
+    else:
+        ao.inputs["Color"].default_value = sock.default_value
+    nt.links.new(ao.outputs["Color"], sock)
 
-    prim("cone", "Skirt", (0, 0, 0.84), (1, 0.72, 1), mat=velvet, parent=root, subsurf=1,
-         radius1=0.25, radius2=0.19, depth=0.36)
-    prim("torus", "Belt", (0, 0, 1.02), (1, 0.76, 1), mat=leather, parent=root, subsurf=1,
-         major_radius=0.19, minor_radius=0.028)
-    prim("cube", "Buckle", (0, -0.165, 1.02), (0.035, 0.012, 0.03), mat=gold, parent=root, bevel=0.005)
-    prim("sphere", "Cuirass", (0, 0, 1.26), (0.21, 0.155, 0.28), mat=steel, parent=root)
-    prim("cyl", "Tabard", (0, -0.02, 1.2), (0.205, 0.145, 0.16),
-         mat=velvet, parent=root, subsurf=2)
-    prim("cube", "Cross.V", (0, -0.163, 1.22), (0.018, 0.01, 0.1), mat=gold, parent=root, subsurf=0,
-         bevel=0.004)
-    prim("cube", "Cross.H", (0, -0.163, 1.25), (0.065, 0.01, 0.018), mat=gold, parent=root, subsurf=0,
-         bevel=0.004)
-    prim("cyl", "Gorget", (0, 0, 1.53), (1, 1, 1), mat=steel, parent=root, subsurf=1,
-         radius=0.085, depth=0.09)
 
-    # arms: knight's right (-X) rests on the sword pommel, left (+X) holds the shield
-    for sx, side in ((1, "L"), (-1, "R")):
-        prim("sphere", f"Pauldron.{side}", (0.235 * sx, 0, 1.46), (0.125, 0.125, 0.09), mat=steel,
-             parent=root)
-        prim("sphere", f"PauldronLame.{side}", (0.25 * sx, 0, 1.39), (0.11, 0.11, 0.06), mat=steel,
-             parent=root)
-    arms = {"R": [(-0.26, 0, 1.42), (-0.29, -0.04, 1.17), (-0.12, -0.24, 1.0)],
-            "L": [(0.26, 0, 1.42), (0.30, -0.02, 1.17), (0.27, -0.25, 1.08)]}
-    for side, (sh, el, wr) in arms.items():
-        limb(f"UpperArm.{side}", sh, el, 0.058, 0.05, steel, root)
-        prim("sphere", f"Couter.{side}", el, (0.065, 0.065, 0.065), mat=steel, parent=root)
-        limb(f"Vambrace.{side}", el, wr, 0.05, 0.045, steel, root)
-        prim("sphere", f"Gauntlet.{side}", wr, (0.055, 0.06, 0.05), mat=steel, parent=root)
+def flame_material():
+    mat = bpy.data.materials.new("Flame")
+    mat.use_nodes = True
+    nt = mat.node_tree
+    bsdf = node(nt.nodes, "BSDF_PRINCIPLED")
+    ramp = nt.nodes.new("ShaderNodeValToRGB")          # yellow core -> orange tips (by facing ratio)
+    ramp.color_ramp.elements[0].color = (1.0, 0.85, 0.3, 1)
+    ramp.color_ramp.elements[1].color = (1.0, 0.25, 0.02, 1)
+    lw = nt.nodes.new("ShaderNodeLayerWeight")
+    lw.inputs["Blend"].default_value = 0.4
+    nt.links.new(lw.outputs["Facing"], ramp.inputs["Fac"])
+    nt.links.new(ramp.outputs["Color"], bsdf.inputs["Base Color"])
+    nt.links.new(ramp.outputs["Color"], bsdf.inputs["Emission Color"])
+    bsdf.inputs["Emission Strength"].default_value = 12.0
+    mat.diffuse_color = (1.0, 0.45, 0.05, 1)
+    return mat
 
-    prim("cyl", "Helm", (0, 0, 1.68), (1, 1, 1), mat=steel, parent=root, subsurf=1,
-         radius=0.118, depth=0.22)
-    prim("sphere", "HelmTop", (0, 0, 1.79), (0.118, 0.118, 0.07), mat=steel, parent=root)
-    prim("cube", "EyeSlit", (0, -0.112, 1.715), (0.085, 0.02, 0.009), mat=dark, parent=root,
-         subsurf=0)
-    prim("cube", "HelmRidge", (0, -0.12, 1.65), (0.008, 0.008, 0.06), mat=steel, parent=root,
-         subsurf=0, bevel=0.003)
-    for i, z in enumerate((1.61, 1.635, 1.66)):
-        for sx in (1, -1):
-            prim("cube", f"Breath.{i}.{sx}", (0.05 * sx, -0.113, z), (0.02, 0.02, 0.004), mat=dark,
-                 parent=root, subsurf=0)
-    prim("sphere", "Plume", (0, 0.03, 1.88), (0.035, 0.13, 0.07), mat=velvet, parent=root)
 
-    # Poly Haven props
-    shield = join_meshes(import_gltf("kite_shield"), "KiteShield")
-    fit(shield, height=0.95)
-    sword = join_meshes(import_gltf("antique_estoc"), "Estoc")
-    sword.rotation_euler.x += math.pi        # imported hilt-down; stand it point-down
-    fit(sword, longest=1.1)
-    shield.location = (0.36, -0.30, 0.42)    # on the left forearm
-    shield.rotation_euler.z = math.radians(-12)
-    sword.location = (-0.12, -0.24, 0.0)     # tip on the pedestal, grip in the right gauntlet
-    for o in (shield, sword):
-        o.parent = root
+def build_stl_knight(turntable):
+    import numpy as np
+    before = set(bpy.data.objects)
+    bpy.ops.wm.stl_import(filepath=STL)
+    ob = next(o for o in bpy.data.objects if o not in before)
+    ob.name = "Knight"
+    me = ob.data
+    n = len(me.polygons)
+    c = np.empty(n * 3)
+    me.polygons.foreach_get("center", c)
+    nr = np.empty(n * 3)
+    me.polygons.foreach_get("normal", nr)
+    reg = stl_regions(c.reshape(-1, 3), nr.reshape(-1, 3))
 
-    root.location = (-0.52, 0.0, 0.30)
-    root.parent = turntable
-    return root, shield, sword
+    steel = pbr_material("DarkSteel", "metal_plate", "2k", scale=5.0, box=True, metallic=1.0,
+                         base_color=(0.42, 0.43, 0.46), rough_mul=0.65, normal_strength=0.3)
+    cape = pbr_material("RedVelvet", "velour_velvet", "1k", scale=6.0, box=True, metallic=0.0,
+                        tint=(0.55, 0.03, 0.04))
+    base = pbr_material("BaseStone", "monastery_stone_floor", "2k", scale=2.5, box=True,
+                        tint=(0.5, 0.5, 0.52))
+    bone = flat_material("Bone", (0.86, 0.8, 0.66), roughness=0.55)
+    for m in (steel, cape, base, bone):
+        add_ao(m)
+    for m in (steel, cape, base, bone, flame_material()):
+        me.materials.append(m)
+    me.polygons.foreach_set("material_index", reg)
+    me.update()
+
+    bpy.ops.object.select_all(action="DESELECT")
+    ob.select_set(True)
+    bpy.context.view_layer.objects.active = ob
+    try:
+        bpy.ops.object.shade_smooth_by_angle(angle=math.radians(35))
+    except Exception as e:                       # older Blender
+        print("smooth by angle unavailable:", e)
+
+    flame_pos = SKULL_C + Vector((0, 0, 0.09))   # STL coords, before fit() moves/scales it
+    lo, hi = world_bbox([ob])
+    scale = 1.9 / (hi.z - lo.z)
+    shift = Vector(((lo.x + hi.x) / 2, (lo.y + hi.y) / 2, lo.z))
+    fit(ob, height=1.9)
+    ob.location = (0, 0, 0.30)                   # on the pedestal top
+    ob.parent = turntable
+
+    glow = bpy.data.lights.new("FlameGlow", "POINT")   # orange light from the flames onto the armour
+    glow.energy = 60
+    glow.color = (1.0, 0.45, 0.12)
+    glow.shadow_soft_size = 0.08
+    glow_ob = bpy.data.objects.new("FlameGlow", glow)
+    bpy.context.collection.objects.link(glow_ob)
+    glow_ob.location = (flame_pos - shift) * scale + Vector((0, 0, 0.30))
+    glow_ob.parent = turntable
+    return ob
+
+
+def setup_glow_compositor():
+    """Fog-glow bloom on the bright flames (EEVEE Next has no built-in bloom)."""
+    scene = bpy.context.scene
+    scene.use_nodes = True
+    nt = scene.node_tree
+    nt.nodes.clear()
+    rl = nt.nodes.new("CompositorNodeRLayers")
+    glare = nt.nodes.new("CompositorNodeGlare")
+    kinds = [i.identifier for i in glare.bl_rna.properties["glare_type"].enum_items]
+    glare.glare_type = "FOG_GLOW" if "FOG_GLOW" in kinds else kinds[0]
+    glare.quality = "HIGH"
+    glare.threshold = 4.0                       # only the flames (emission 12), not steel highlights
+    glare.size = 7
+    comp = nt.nodes.new("CompositorNodeComposite")
+    nt.links.new(rl.outputs["Image"], glare.inputs["Image"])
+    nt.links.new(glare.outputs["Image"], comp.inputs["Image"])
 
 
 def setup_camera_lights():
     cam_data = bpy.data.cameras.new("TurntableCam")
-    cam_data.lens = 72
+    cam_data.lens = 80
     cam = bpy.data.objects.new("TurntableCam", cam_data)
     bpy.context.collection.objects.link(cam)
     cam.location = (0, -6.4, 1.9)
     target = bpy.data.objects.new("CamTarget", None)
     bpy.context.collection.objects.link(target)
-    target.location = (0, 0, 1.08)
+    target.location = (0, 0, 1.14)
     track = cam.constraints.new("TRACK_TO")
     track.target = target
     track.track_axis = "TRACK_NEGATIVE_Z"
@@ -440,11 +478,11 @@ def main():
     clear_scene()
     setup_world()
     turntable = setup_floor_and_pedestal()
-    build_chess_knight(turntable)
-    build_armoured_knight(turntable)
+    build_stl_knight(turntable)
     setup_camera_lights()
     animate_turntable(turntable)
     setup_render()
+    setup_glow_compositor()
     bpy.context.scene.frame_set(1)
     print("knight scene ready")
 

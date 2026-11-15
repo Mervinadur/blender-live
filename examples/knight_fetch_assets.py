@@ -7,7 +7,7 @@ UA = {"User-Agent": "blender-live-script/1.0"}
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "assets")
 
-MODELS = {"chess_set": "2k", "kite_shield": "2k", "antique_estoc": "2k"}
+MODELS = {}   # was chess_set, kite_shield, antique_estoc (v1); the knight is now the user's STL
 HDRI = ("castle_zavelstein_cellar", "2k")
 TEXTURES = {"metal_plate": "2k", "velour_velvet": "1k", "marble_01": "2k", "monastery_stone_floor": "2k"}
 TEX_MAPS = ["diff", "nor_gl", "rough", "arm", "metal"]   # whichever exist

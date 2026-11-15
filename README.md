@@ -26,10 +26,11 @@ You say what to change ("make the handle 20% thicker"), Claude edits the model, 
   and start again.
 
 ## Examples
-- `examples/knight_turntable.gif`: a smooth 360° turntable of two knights on a marble pedestal: the marble chess knight from
-  Poly Haven's Chess Set and an armoured knight built in code with a Poly Haven shield and sword (5-second loop, 600×600, 24 fps).
-  All assets are CC0 from [Poly Haven](https://polyhaven.com). To rebuild it: `knight_fetch_assets.py` downloads the assets,
-  `knight_setup_scene.py` builds the scene and animation in Blender (expects the assets at `/root/models/knight/assets`, or set `KNIGHT_ASSETS`).
+- `examples/knight_turntable.gif`: a smooth 360° turntable of your knight model (from your STL), coloured in Blender: steel armour,
+  red velvet cape, stone base, bone skulls and glowing flames, on a marble pedestal in a castle cellar (5-second loop, 600×600, 24 fps).
+  Textures and lighting are CC0 from [Poly Haven](https://polyhaven.com). To rebuild it: `knight_fetch_assets.py` downloads the
+  textures, `knight_setup_scene.py` builds the scene in Blender (needs the STL at `/root/models/knight/Knight.stl`, or set `KNIGHT_STL`).
+- `examples/knight_turntable_v1.gif`: the first version, with Poly Haven's marble chess knight next to a knight built in code.
 - `examples/astronaut_walk.gif`: the rigged astronaut walking, a 1-second looping isometric animation (480×480, 12 fps).
 - `examples/astronaut_moon.gif`: the astronaut on the Moon, with slow low-gravity hops and then a big leap over a cratered surface (4-second loop, 400×400).
 - `examples/coffee_mug_colours.gif`: 5-second looping isometric animation of the mug changing through 5 colours.
