@@ -35,6 +35,14 @@ It prints the time and rough cost at the end (the knight turntable, 120 frames, 
 `--kill-all` deletes them. As a safety net, each machine deletes itself after 90 minutes.
 Your .blend (with its textures packed in) is uploaded to RunPod for the render.
 
+## Making a render look real (self-hosted AI, no Replicate)
+`./ai-remote.sh models/<name>` rents one RTX 4090 on RunPod and runs the open-source **Wan 2.1 VACE** video model
+(Apache 2.0) on your Blender walk-through. Each frame follows the scene's depth (Depth Anything V2), so the layout stays
+the same as in Blender, and each ~5 s chunk carries on from the end of the one before, so there are no cuts.
+Inputs: `models/<name>/ai_in/f_0001.jpg…` (832x480, 16 fps), plus optional `anchor.jpg` (a photoreal still of frame 1),
+`prompt.txt` and `negative.txt`. Output: `models/<name>/ai_out.mp4` (1280x720). `CHUNKS=2` makes a ~10 s test.
+First full run (nature trail, 60 s): 66 min, about $0.98. Known issue: colours get stronger chunk after chunk (see CLAUDE.md).
+
 ## Limits
 - Renders on the phone use the CPU (software OpenGL), so heavy scenes are slow; see RunPod above.
 - Blender makes meshes. For exact parametric parts for Inventor (STEP), use CAD Agent.

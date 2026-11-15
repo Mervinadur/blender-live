@@ -16,6 +16,11 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   official Blender x64 tarball; Cycles set to OptiX/CUDA via `gpu.py`), pulls frames to `<model>/remote_frames/`, deletes the pod
   on exit + a self-delete timer on the pod (MAX_MINUTES=90). Key in `~/.config/runpod/api_key` (user puts it there, never me);
   SSH key `~/.ssh/runpod_ed25519`. Packs assets locally first (4.3), so 5.x files need `PACK=0 BLENDER_VERSION=5.2.2`.
+- `ai-remote.sh` + `ai/vace_trail.py`: self-hosted AI "make it real" pass on one RunPod GPU (image `runpod/pytorch:2.4.0-…`,
+  torch upgraded to 2.5.1 on the pod because diffusers 0.35 needs `enable_gqa`). Wan 2.1 VACE (1.3B default, `MODEL=14B`),
+  depth control from Depth Anything V2 **Large (CC-BY-NC, non-commercial; switch to Small if the user goes commercial)**.
+  Inputs `<model>/ai_in/` (f_*.jpg 832x480 16 fps, anchor.jpg, prompt.txt, negative.txt); outputs `ai_out/`, `ai_out_depth/`
+  (re-uploaded on the next run = resume), `ai_out.mp4`. Job runs under nohup on the pod; log has timestamps.
 - `pod-image/`: Dockerfile + start.sh for the RunPod image (Blender 4.3.2, libs, sshd, ffmpeg); built by `.github/workflows/pod-image.yml`.
 - `models/`: the user's working files (gitignored), **one folder per model** (`models/<model-name>/`: .blend, source files,
   render frames, tests). Currently `coffee-mug/`, `astronaut/`, `man-rigged/`, `knight/`, `nature-trail/`. New model → new folder. Inside Debian: `/root/models/<model-name>/`.
@@ -163,6 +168,22 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   Cost ≈ $2.7 (Seedance returned 1920x1088 although 720p was asked; if billed as 1080p it is ≈ $5).
   **User verdict 2026-11-15: failure.** 11 clips from 6 keyframes don't feel like one continuous walk, and $2.4+ for 1 min vs
   cents for everything else is too much. Replicate ban is back on. Next: a non-Replicate route (proposed: photoreal Cycles
-  re-render of the same scene on RunPod). **Waiting on the user's pick.**
+  re-render of the same scene on RunPod). User picked **self-hosted AI on RunPod** (Wan 2.1 VACE, see Files).
+- 2026-11-15: **AI nature trail, first full run** (`models/nature-trail/ai_out.mp4`, 60 s, 960 frames 16 fps, 1280x720 upscaled from
+  832x480, 84 MB; `ai_compare.mp4` = Blender on top, AI below; phone only, user views via Material Files, not committed).
+  Recipe: frames from `examples/nature_trail.mp4` via `ffmpeg -vf "fps=16,scale=-2:480:flags=lanczos,crop=832:480"`, anchor = earlier
+  FLUX still `nt-key-0.jpg` cropped the same way; 14 chunks of 81 frames, 8-frame overlap, 30 steps, cfg 5, last chunk shrunk to 13.
+  **Timing (RTX 4090 SECURE $0.89/h): 66m23s, $0.98.** Pod→SSH 38 s; upload + pip ≈ 3 min; model load 2 min; **263 s per chunk**
+  (very steady), 58 min generating (87%); download 55 s, encode 35 s. Setup total ≈ 6 min ≈ $0.09. VRAM only 9.6/24 GB (cpu offload on).
+  Test runs: 1st failed on torch 2.4 ($0.09); 2nd = 2 chunks ($0.19, `ai_test1/`: sun + lens flare + autumn drift → fixed by prompt.txt
+  / negative.txt). Depth maps took ~1 min on the pod (done in the failed run, reused since).
+  **Result:** first ~25 s look like real footage, layout matches Blender, chunk joints seamless. Then **cumulative colour drift**:
+  more saturation/contrast every chunk (neon grass, crushed shadows), and the cliff crane-up ending (~40-60 s) is unrealistic
+  blue/cyan. Fix ideas, not done: colour-match the 8 overlap frames (and outputs) to the anchor before each chunk; or keyframe pass +
+  parallel fill-in (user asked about splitting over pods: plan = one pod makes 81 keyframes every 12th frame in one generation,
+  then N pods fill chunks between fixed keyframes; ~25-30 min wall, ~30-40% more cost; test on 10 s first). Also: drop cpu offload on
+  24 GB cards; try 14B for detail.
+  Bug fixed after the run: the ssh that starts the pod job hung (stdin not detached) so progress only showed at the end; now `</dev/null`.
+  **Waiting on the user:** watch `ai_out.mp4` / `ai_compare.mp4`, pick the next refinement.
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
