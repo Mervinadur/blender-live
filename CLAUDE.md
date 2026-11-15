@@ -142,7 +142,7 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   190 MB in `assets/`): island_tree_01/02 (pine/fir trees are 0.5-1 GB each, skipped), saplings, boulders, coast rocks,
   mountainside cliffs, grass/fern/flower clumps (~3k collection-instance empties), forest_ground_04 trail texture,
   forest_slope HDRI. Camera walks a winding trail (frames 1-1200), cranes up to the cliffs (1200-1440); trees sway (noise
-  F-curve modifiers), sun keyed from afternoon to golden hour, light world-volume haze. User asked to keep it phone-friendly:
+  F-curve modifiers), sun keyed from afternoon to golden hour (haze removed, see below). User asked to keep it phone-friendly:
   1280x720, EEVEE 16 samples, no raytracing, heavy meshes decimated (decimate needs the object linked to the scene; the
   AssetLib collection is excluded so it isn't evaluated). .blend 112 MB. EEVEE on the phone: 6.5 min/frame and came out black
   (llvmpipe), so don't preview EEVEE here; the user checked the layout in the live X11 Blender instead.
@@ -154,6 +154,6 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   run of the queue + ready-made image: works. Frames in `models/nature-trail/remote_frames/` (phone only).
   Known weakness: the crane-up ending (frames ~1250-1440) ends close on the cliff face rather than an open reveal; fix = aim the
   target higher / stop the camera further back in `build.py` camera section, re-render 1200-1440 only.
-  Live X11 Blender still has the pre-fix .blend open (with haze); reopen `nature_trail.blend` if the user wants to look again.
+  The fixed `nature_trail.blend` is open in the live X11 Blender.
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
