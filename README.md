@@ -26,7 +26,7 @@ One-time setup:
 
 Use (or just ask Claude): `./render-remote.sh models/knight/knight_turntable.blend -a` renders all frames into
 `models/knight/remote_frames/`. Anything after the file goes to Blender (e.g. `-E CYCLES -s 1 -e 24 -a`, or `-f 1` for one still).
-It prints the time and rough cost at the end (the first test, one coffee-mug frame, took 1.5 minutes and cost about $0.02). `./render-remote.sh --list` shows any machines still running,
+It prints the time and rough cost at the end (the knight turntable, 120 frames, took under 2 minutes and about $0.03, against about 32 minutes on the phone). `./render-remote.sh --list` shows any machines still running,
 `--kill-all` deletes them. As a safety net, each machine deletes itself after 90 minutes.
 Your .blend (with its textures packed in) is uploaded to RunPod for the render.
 

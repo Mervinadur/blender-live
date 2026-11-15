@@ -105,6 +105,10 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   Lessons: new scoped RunPod keys only work on **REST v2** (`https://api.runpod.io/v2`); v1 (`rest.runpod.io/v1`) returns 401 for
   them. Scopes are fixed when a key is created (ticking boxes later in "Edit" does nothing). The key needs REST API → Pods R/W.
   The user saves the key with nano in a second Termux session; I check it by fingerprint/mtime, never print it.
+- 2026-11-15: Knight turntable on RunPod: `./render-remote.sh models/knight/knight_turntable.blend -a`, 120 frames EEVEE 720 px,
+  **1m54s total, ~$0.03** (phone: ~32 min). Packed upload 32 MB. Frame 1 took 27 s (EEVEE shader compile), then ~0.2 s/frame.
+  Headless EEVEE works on the pod (no EGL errors). Frames in `models/knight/remote_frames/`, match the phone's `frames/`
+  (side-by-side check of frame 31). Log: `models/knight/remote.log`. COMMUNITY had no 4090 again → SECURE $0.89/h.
   Next (user's plan): build on this once happy, e.g. a pre-built image with Blender baked in, or Serverless.
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
