@@ -24,4 +24,4 @@ jobs:
           context: pod-image
           push: true
           build-args: BLENDER_VERSION=${{ env.BLENDER_VERSION }}
-          tags: ghcr.io/mervinadur/blender-pod:${{ env.BLENDER_VERSION }}
+          tags: ghcr.io/mervinadur/blender-render:${{ env.BLENDER_VERSION }}

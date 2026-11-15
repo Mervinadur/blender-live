@@ -1,6 +1,6 @@
 # Ready-made render machine for render-remote.sh: Blender (same version as the phone) + its libraries,
 # SSH and ffmpeg, so a RunPod pod can start rendering as soon as it boots (no apt/download per job).
-# Built and pushed by .github/workflows/pod-image.yml to ghcr.io/mervinadur/blender-pod:<version>.
+# Built and pushed by .github/workflows/pod-image.yml to ghcr.io/mervinadur/blender-render:<version>.
 FROM ubuntu:24.04
 ARG BLENDER_VERSION=4.3.2
 ENV DEBIAN_FRONTEND=noninteractive \
