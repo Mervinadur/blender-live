@@ -85,5 +85,14 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   `models/knight/knight_turntable.blend` (open in the live Blender). Render: EEVEE Next 16 samples, 720 px (Cycles here has no denoiser),
   run **headless** in a second Blender (`blender -b ... -a`, same proot binds + DISPLAY=:0) so the MCP socket stays free: ~16 s/frame,
   ~32 min. GIF: lanczos scale 600, palettegen stats_mode=diff, paletteuse sierra2_4a + diff_mode=rectangle. Frames in `models/knight/frames/`.
+- 2026-11-15: Knight v2 (**half-done**): user asked to replace both knights with their STL `models/knight/Knight.stl` (15 MB,
+  one solid mesh, 300k tris, 1.015 tall, faces −Y, raised flaming skull hand on +X; not committed, it's the user's file) and colour it.
+  `setup_scene.py` `build_stl_knight` + `stl_regions`: per-face regions by position (armour / cape y>0.02 + side flares / base z<0.085
+  / bone skulls (held skull = least-squares sphere C(0.1818,-0.1183,0.8603) R 0.06) / flames above it), materials dark steel
+  (metal_plate maps), red velvet, stone base, bone (all with an AO node), emissive flames + orange point light + compositor fog glow
+  (threshold 4). Scaled to 1.9 m, pedestal shrunk (0.86/0.98), lens 80. fetch_assets no longer downloads the v1 glTF models.
+  v1 frames kept in `frames_v1/`. Render: 96/120 frames done when a session died; frames 97-120 re-rendered after. Still to do:
+  GIF → `examples/knight_turntable.gif` (replaces v1), copy scripts to `examples/`, README.
+  Note: one headless run ran at 64 s/frame (55 s before sampling), a re-run alone was 17 s; don't render in the live Blender at the same time.
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
