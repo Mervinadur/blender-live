@@ -21,6 +21,11 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   depth control from Depth Anything V2 **Large (CC-BY-NC, non-commercial; switch to Small if the user goes commercial)**.
   Inputs `<model>/ai_in/` (f_*.jpg 832x480 16 fps, anchor.jpg, prompt.txt, negative.txt); outputs `ai_out/`, `ai_out_depth/`
   (re-uploaded on the next run = resume), `ai_out.mp4`. Job runs under nohup on the pod; log has timestamps.
+  **Required step for the next AI animation (user, 2026-11-15): colour correction between chunks. Not built into the code yet;
+  add it to `vace_trail.py` before the next run.** Without it, saturation/contrast grow every chunk (nature trail went neon after ~25 s).
+  Method: before each chunk k>0, colour-match the 8 overlap frames to the reference look (anchor.jpg, or chunk 0's frames) with
+  per-channel mean/std transfer in LAB (Reinhard), then feed them to VACE; apply the same match to every saved output frame.
+  Add a strength setting (0.5-1.0) so deliberate lighting changes (e.g. a sunset scene) aren't flattened. Test on 2-3 chunks first.
 - `pod-image/`: Dockerfile + start.sh for the RunPod image (Blender 4.3.2, libs, sshd, ffmpeg); built by `.github/workflows/pod-image.yml`.
 - `models/`: the user's working files (gitignored), **one folder per model** (`models/<model-name>/`: .blend, source files,
   render frames, tests). Currently `coffee-mug/`, `astronaut/`, `man-rigged/`, `knight/`, `nature-trail/`. New model → new folder. Inside Debian: `/root/models/<model-name>/`.
@@ -184,6 +189,6 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   then N pods fill chunks between fixed keyframes; ~25-30 min wall, ~30-40% more cost; test on 10 s first). Also: drop cpu offload on
   24 GB cards; try 14B for detail.
   Bug fixed after the run: the ssh that starts the pod job hung (stdin not detached) so progress only showed at the end; now `</dev/null`.
-  **Waiting on the user:** watch `ai_out.mp4` / `ai_compare.mp4`, pick the next refinement.
+  **User verdict:** everything looks right except the colour drift; colour correction is now a required step (see Files). Nothing pending.
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
