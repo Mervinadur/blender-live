@@ -69,5 +69,9 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   shrinks with height. View transform set to Standard (AgX was too dark). Rendered 48 frames in ~80 s to `models/moon_gif/`.
 - Lesson: while I render, the user's view in Termux:X11 is live, and a touch rotated/moved selected objects mid-render. Set
   `hide_select=True` on the scene objects during long renders (restore after), and check object transforms before rendering.
+- 2026-11-15: The "glitched" astronaut in the X11 viewport was the rig, not a graphics bug: the glTF import gave bones
+  display lengths up to 41 m (glTF stores no bone length), drawn OCTAHEDRAL + show_in_front, covering the 1.8 m body.
+  Fix: hide the Armature in the viewport (`arm.hide_set(True)`; the mesh still deforms) and viewport Solid + TEXTURE colours.
+  Don't shorten the bones (changing tails changes rest orientation and breaks the actions). Not saved to the .blend yet.
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
