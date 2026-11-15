@@ -44,5 +44,10 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   Termux can't write to the phone's Downloads (no All-files access), so the user gets files from GitHub.
 - STL export recipe: join evaluated meshes (the handle is a curve) into a temp object, then
   `bpy.ops.wm.stl_export(export_selected_objects=True, global_scale=1000)` so the units are mm for Inventor.
+- 2026-11-15: `examples/coffee_mug_colours.gif`: 5 s, 12 fps, 480×480, looping isometric view of the mug
+  cycling red → yellow → green → blue → purple → red. Recipe: ortho camera at rotation (54.7356°, 0, 45°),
+  ortho_scale 0.16, shift (-0.035, 0.056); Workbench render (MATERIAL colours, so `mat.diffuse_color` is keyed
+  along with Base Color), 60 PNGs to `models/mug_gif/` (19 s total), then Termux ffmpeg palettegen/paletteuse → GIF.
+  The scene setup is saved in `models/coffee_mug.blend`.
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
