@@ -25,8 +25,11 @@ One-time setup:
    `chmod 600 ~/.config/runpod/api_key`.
 
 Use (or just ask Claude): `./render-remote.sh models/knight/knight_turntable.blend -a` renders all frames into
-`models/knight/remote_frames/`. `PODS=4 ./render-remote.sh … -a` splits the frames over 4 GPUs at once (about 4× faster,
-about the same total cost). The machines boot from a ready-made image with Blender 4.3.2 inside
+`models/knight/remote_frames/`. `PODS=4 ./render-remote.sh … -a` uses up to 4 GPUs at once (about 4× faster,
+about the same total cost). The frames are cut into small jobs (`JOB=120` frames each), and each machine takes the next job
+as soon as it's free. GPUs are often sold out, so the script keeps trying every GPU type for up to `WAIT_MINUTES` (default 60):
+one machine can finish everything on its own, and more just speed it up as they become free. If anything fails, run the same
+command again: frames already downloaded are skipped. The machines boot from a ready-made image with Blender 4.3.2 inside
 (`ghcr.io/mervinadur/blender-render:4.3.2`, built from `pod-image/` by GitHub Actions), so nothing is installed per job. Anything after the file goes to Blender (e.g. `-E CYCLES -s 1 -e 24 -a`, or `-f 1` for one still).
 It prints the time and rough cost at the end (the knight turntable, 120 frames, took under 2 minutes and about $0.03, against about 32 minutes on the phone). `./render-remote.sh --list` shows any machines still running,
 `--kill-all` deletes them. As a safety net, each machine deletes itself after 90 minutes.
@@ -45,6 +48,10 @@ Your .blend (with its textures packed in) is uploaded to RunPod for the render.
   and start again.
 
 ## Examples
+- **`examples/nature_trail.mp4`**: a 1-minute walk along a dirt trail through a meadow with trees, ending at rock cliffs
+  (1280×720, 24 fps, 20 MB). The trees sway in the wind and the sun sinks towards golden hour. All models, textures and lighting
+  are CC0 from [Poly Haven](https://polyhaven.com). Rendered on 3 rented GPUs at once in 7.5 minutes for about $0.31.
+  `nature_trail_still.jpg` is one frame. Rebuild: `nature_trail_fetch_assets.py` downloads the assets, `nature_trail_build.py` builds the scene.
 - **`examples/knight_turntable_v3.mp4`** (best quality): your knight rendered in Cycles (realistic light) at 1440×1800 (4:5 portrait),
   one smooth 5-second turn at 24 fps. Fixed colours (clean red cape, steel boots and helmet, white skulls on the base, no red patch
   on the arm) and smooth polished steel. `knight_turntable_v3.gif` is a smaller preview, `knight_v3_still.png` a full-size still.

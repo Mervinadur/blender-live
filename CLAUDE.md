@@ -18,7 +18,7 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   SSH key `~/.ssh/runpod_ed25519`. Packs assets locally first (4.3), so 5.x files need `PACK=0 BLENDER_VERSION=5.2.2`.
 - `pod-image/`: Dockerfile + start.sh for the RunPod image (Blender 4.3.2, libs, sshd, ffmpeg); built by `.github/workflows/pod-image.yml`.
 - `models/`: the user's working files (gitignored), **one folder per model** (`models/<model-name>/`: .blend, source files,
-  render frames, tests). Currently `coffee-mug/`, `astronaut/`, `man-rigged/`, `knight/`. New model → new folder. Inside Debian: `/root/models/<model-name>/`.
+  render frames, tests). Currently `coffee-mug/`, `astronaut/`, `man-rigged/`, `knight/`, `nature-trail/`. New model → new folder. Inside Debian: `/root/models/<model-name>/`.
 - `examples/`: finished models committed so the user can download them from GitHub (e.g. `coffee_mug.stl`).
 
 ## Rules
@@ -130,5 +130,30 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   the image or with PODS>1; first test planned: coffee mug, PODS=2. Old private package `blender-pod` is unused (user may delete).
   Repo made **PUBLIC** by the user 2026-11-15 (audit: no secrets in history; commit email visible, user OK with it).
   Ideas not done: CUDA instead of OptiX for short jobs (skips ~3 min compile), mp4 encode on the pod, auto-retry of slow pods.
+- 2026-11-15: **render-remote.sh v3 = job queue** (user: GPUs are hard to get, render as pods become free). Frames cut into
+  `JOB`-frame jobs (default 120) as files in `$WORK/todo/` (named FIRST_LAST); up to `PODS` workers, each loops
+  `( run_chunk n )` in a subshell: try every GPU type × cloud (4090/3090/A5000 + `GPU_MORE` list: L40S, A6000, 4080 SUPER,
+  A4500, L4), retry every 30 s for `WAIT_MINUTES` (default 60). A pod uploads once, then claims jobs by `mv todo→claimed`
+  (atomic) until the queue is empty; the EXIT trap puts the current job back and deletes the pod. Frames already in OUT_DIR are
+  skipped when jobs are built (re-run = resume). Exit 3 = key 401/403 → worker stops. Gotcha: with `pipefail`, a `grep | wc`
+  that matches nothing killed the script silently; use `grep -c … || true`. Dry-run tested with a fake key, then a real run (nature trail, below).
+- 2026-11-15: **Nature trail** (`models/nature-trail/`, user's request: Poly Haven scene, nature theme, 60 s, multi-pod render,
+  result in examples). Poly Haven has no downloadable scenes, so `build.py` assembles one from CC0 assets (`fetch_assets.py`,
+  190 MB in `assets/`): island_tree_01/02 (pine/fir trees are 0.5-1 GB each, skipped), saplings, boulders, coast rocks,
+  mountainside cliffs, grass/fern/flower clumps (~3k collection-instance empties), forest_ground_04 trail texture,
+  forest_slope HDRI. Camera walks a winding trail (frames 1-1200), cranes up to the cliffs (1200-1440); trees sway (noise
+  F-curve modifiers), sun keyed from afternoon to golden hour, light world-volume haze. User asked to keep it phone-friendly:
+  1280x720, EEVEE 16 samples, no raytracing, heavy meshes decimated (decimate needs the object linked to the scene; the
+  AssetLib collection is excluded so it isn't evaluated). .blend 112 MB. EEVEE on the phone: 6.5 min/frame and came out black
+  (llvmpipe), so don't preview EEVEE here; the user checked the layout in the live X11 Blender instead.
+  First pod render came out **black** on the GPU too: cause was a Principled Volume on the World (haze). In an open world it
+  absorbs all sky and sun light. Removed. Quick check method: phone Cycles at 12% res, 4 samples, `use_denoising=False` (~30 s).
+  **Done**: `examples/nature_trail.mp4` (1280x720, 24 fps, 1440 frames, x264 crf 26, 20 MB), `nature_trail_still.jpg` (frame 600),
+  scripts `examples/nature_trail_build.py` / `nature_trail_fetch_assets.py`. Render: `PODS=4 JOB=120 WAIT_MINUTES=40`, 3 pods
+  (4090s; several 4090 pods had no public IP and were swapped automatically), **7m32s, ~$0.31**, 0.2-0.4 s/frame EEVEE. First real
+  run of the queue + ready-made image: works. Frames in `models/nature-trail/remote_frames/` (phone only).
+  Known weakness: the crane-up ending (frames ~1250-1440) ends close on the cliff face rather than an open reveal; fix = aim the
+  target higher / stop the camera further back in `build.py` camera section, re-render 1200-1440 only.
+  Live X11 Blender still has the pre-fix .blend open (with haze); reopen `nature_trail.blend` if the user wants to look again.
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.

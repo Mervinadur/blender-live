@@ -5,6 +5,7 @@
 #   PODS=4 ./render-remote.sh models/knight/knight_v3.blend -a          # frames split over 4 pods at once
 #   ./render-remote.sh models/knight/knight_v3.blend -s 1 -e 24 -a      # a frame range
 #   ./render-remote.sh models/coffee-mug/coffee_mug.blend -f 1          # one still
+#   PODS=4 JOB=60 ./render-remote.sh f.blend -a                         # queue of 60-frame jobs, pods take jobs as they come up
 #   ./render-remote.sh --list          # show pods on the account (check nothing is left billing)
 #   ./render-remote.sh --kill-all      # delete every pod on the account
 #
@@ -16,10 +17,13 @@
 # IMAGE=ubuntu:24.04 installs Blender on boot instead); PACK=0 to upload the file as is;
 # CLOUD=SECURE to skip Community Cloud; MAX_MINUTES (default 90);
 # PRE_PY=script.py runs that script on each pod before rendering (after the GPU setup).
+# Job queue: frames are cut into JOB-frame jobs (default 120). Up to PODS workers each keep trying to get a pod
+# (every GPU type, retrying for WAIT_MINUTES, default 60); a pod uploads once, then takes jobs until none are left.
+# A failed pod's job goes back in the queue. Frames already in the output folder are skipped (re-run = resume).
 set -euo pipefail
 DIR="$HOME/blender-live"
 API="https://api.runpod.io/v2"   # REST v2: new scoped keys (Pods R/W) only work here, not on v1
-case "${1:-}" in ""|-h|--help) sed -n '2,19p' "$0"; exit;; esac
+case "${1:-}" in ""|-h|--help) sed -n '2,23p' "$0"; exit;; esac
 KEY="${RUNPOD_API_KEY:-$(cat "$HOME/.config/runpod/api_key" 2>/dev/null || true)}"
 [ -n "$KEY" ] || { echo "No API key. Put it in ~/.config/runpod/api_key (chmod 600)."; exit 1; }
 api() { curl -sS -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" "$@"; }
@@ -67,16 +71,23 @@ UPLOAD="$BLEND"
 if [ "${PACK:-1}" = 1 ]; then mv "$DIR/models/.packed-$$.blend" "$WORK/$NAME.blend"; UPLOAD="$WORK/$NAME.blend"; fi
 echo "   upload size: $(du -h "$UPLOAD" | cut -f1), scene frames $SCENE_S-$SCENE_E"
 
-# Split the frames into one contiguous chunk per pod.
-CHUNKS=()
+# Job queue: one file per job in todo/ (named FIRST_LAST); workers claim a job by moving it to claimed/ (atomic).
+mkdir -p "$WORK/todo" "$WORK/claimed" "$WORK/done"
+JOB="${JOB:-120}"; NFR=0
+declare -A HAVE; for f in "$OUT_DIR"/frame_*; do [ -e "$f" ] && { x="${f##*/frame_}"; HAVE[$((10#${x%%.*}))]=1; }; done
 if [ -n "$FRAME" ]; then
-  CHUNKS=("$FRAME $FRAME")
+  touch "$WORK/todo/${FRAME}_${FRAME}"; NFR=1
 else
-  FS="${FS:-$SCENE_S}"; FE="${FE:-$SCENE_E}"; TOTAL=$((FE - FS + 1))
-  [ "$PODS" -gt "$TOTAL" ] && PODS="$TOTAL"
-  SIZE=$(( (TOTAL + PODS - 1) / PODS ))
-  for ((a = FS; a <= FE; a += SIZE)); do b=$((a + SIZE - 1)); [ "$b" -gt "$FE" ] && b="$FE"; CHUNKS+=("$a $b"); done
+  FS="${FS:-$SCENE_S}"; FE="${FE:-$SCENE_E}"
+  for ((a = FS; a <= FE; a += JOB)); do
+    b=$((a + JOB - 1)); [ "$b" -gt "$FE" ] && b="$FE"
+    miss=0; for ((f = a; f <= b; f++)); do [ -n "${HAVE[$f]:-}" ] || miss=1; done
+    [ "$miss" = 1 ] && { touch "$WORK/todo/${a}_${b}"; NFR=$((NFR + b - a + 1)); }
+  done
 fi
+NJOBS=$(ls "$WORK/todo" | wc -l)
+[ "$NJOBS" -gt 0 ] || { echo "== All frames are already in $OUT_DIR"; exit 0; }
+[ "$PODS" -gt "$NJOBS" ] && PODS="$NJOBS"
 
 # 2. Pod settings. The ready-made image boots with Blender installed; a plain image installs it first.
 START='set -e; export DEBIAN_FRONTEND=noninteractive; apt-get update -q
@@ -111,34 +122,52 @@ for s in bpy.data.scenes: s.cycles.device = "GPU"
 print("GPU devices:", [(d.name, d.type) for d in p.devices if d.use])'
 printf '%s\n' "$GPUPY" > "$WORK/gpu.py"
 
-# 3. One pod per chunk: create, wait for SSH, upload, render its frames, download them, delete the pod.
-run_chunk() { # $1 = chunk number, $2 = first frame, $3 = last frame
-  local n="$1" a="$2" b="$3" RESP CODE TRY_GPU P ST IP="" PORT="" i
-  POD=""; T0=""; RATE=""   # not local: the EXIT trap (pod delete) runs after the function returns
-  trap '[ -n "$POD" ] && api -X DELETE "$API/pods/$POD" >/dev/null && echo "== Pod $POD deleted"
+# 3. One pod per worker (run in a subshell): create, wait for SSH, upload once, then claim jobs from the queue,
+#    render each, download its frames; delete the pod when the queue is empty or something fails.
+run_chunk() { # $1 = worker number
+  local n="$1" RESP CODE TRY_GPU P ST IP="" PORT="" i
+  POD=""; T0=""; RATE=""; CUR=""   # not local: the EXIT trap (pod delete, job hand-back) runs after the function returns
+  trap '[ -n "$CUR" ] && mv "$WORK/claimed/$CUR" "$WORK/todo/" 2>/dev/null && echo "   job $CUR back in the queue"
+        [ -n "$POD" ] && api -X DELETE "$API/pods/$POD" >/dev/null && echo "== Pod $POD deleted"
         [ -n "${T0:-}" ] && echo "COST $(( $(date +%s) - T0 )) ${RATE:-0}"' EXIT
-  echo "== Creating pod for frames $a-$b ($GPU)"
-  for TRY_GPU in "$GPU" "NVIDIA GeForce RTX 4090" "NVIDIA GeForce RTX 3090" "NVIDIA RTX A5000"; do
+  echo "== Worker $n: trying to get a pod ($(date +%H:%M:%S))"
+  # Try GPU types x clouds in order. A pod that never gets a direct (public) SSH port is deleted and the next
+  # option is tried: some Community hosts have no public IP, and the ssh.runpod.io proxy can't copy files.
+  local GPUS=("$GPU" "NVIDIA GeForce RTX 4090" "NVIDIA GeForce RTX 3090" "NVIDIA RTX A5000")
+  # More types to try when those are sold out (comma-separated, e.g. GPU_MORE="NVIDIA L40S,NVIDIA RTX A6000")
+  IFS=, read -ra MORE <<<"${GPU_MORE:-NVIDIA L40S,NVIDIA RTX A6000,NVIDIA GeForce RTX 4080 SUPER,NVIDIA RTX A4500,NVIDIA L4}"
+  for TRY_GPU in "${GPUS[@]}" "${MORE[@]}"; do
     for CLOUD in ${CLOUD:-COMMUNITY SECURE}; do
       RESP="$(create_pod "$CLOUD" "$TRY_GPU")"; CODE="$(tail -1 <<<"$RESP")"; RESP="$(sed '$d' <<<"$RESP")"
       POD="$(jq -r '.id // empty' <<<"$RESP" 2>/dev/null || true)"
-      [ -n "$POD" ] && break 2
-      echo "   $TRY_GPU / $CLOUD failed ($CODE): $(jq -r '.detail // .title // .' <<<"$RESP" 2>/dev/null | head -c 200)"
-      case "$CODE" in *401*) echo "   (API key rejected)"; exit 1;; *403*) echo "   (key lacks Pods Read/Write)"; exit 1;; esac
+      if [ -z "$POD" ]; then
+        echo "   $TRY_GPU / $CLOUD failed ($CODE): $(jq -r '.detail // .title // .' <<<"$RESP" 2>/dev/null | head -c 200)"
+        case "$CODE" in *401*) echo "   (API key rejected)"; exit 3;; *403*) echo "   (key lacks Pods Read/Write)"; exit 3;; esac
+        continue
+      fi
+      echo "$POD" >> "$WORK/pods"
+      T0=$(date +%s); RATE="$(jq -r '.cost // empty' <<<"$RESP")"
+      echo "   pod $POD ($TRY_GPU, $CLOUD, \$${RATE:-?}/h)"
+      IP=""; PORT=""; local RUN_T=""
+      for i in $(seq 1 120); do
+        P="$(api "$API/pods/$POD")"; ST="$(jq -r '.status // empty' <<<"$P")"
+        [ "$ST" = ERROR ] && { echo "   pod status ERROR"; break; }
+        IP="$(jq -r 'if .status == "RUNNING" then .ssh.direct.host // empty else empty end' <<<"$P")"
+        PORT="$(jq -r 'if .status == "RUNNING" then .ssh.direct.port // empty else empty end' <<<"$P")"
+        [ -n "$IP" ] && [ -n "$PORT" ] && break
+        if [ "$ST" = RUNNING ]; then
+          [ -n "$RUN_T" ] || RUN_T=$(date +%s)
+          [ $(( $(date +%s) - RUN_T )) -gt 60 ] && { echo "   running but no public SSH port (no public IP)"; break; }
+        fi
+        sleep 5
+      done
+      [ -n "$IP" ] && [ -n "$PORT" ] && break 2
+      api -X DELETE "$API/pods/$POD" >/dev/null && echo "   deleted $POD, trying the next option"
+      POD=""; T0=""
     done
   done
-  [ -n "$POD" ] || { echo "!! No pod created"; exit 1; }
-  echo "$POD" >> "$WORK/pods"
-  T0=$(date +%s); RATE="$(jq -r '.cost // empty' <<<"$RESP")"
-  echo "   pod $POD ($TRY_GPU, $CLOUD, \$${RATE:-?}/h)"
-  for i in $(seq 1 120); do
-    P="$(api "$API/pods/$POD")"; ST="$(jq -r '.status // empty' <<<"$P")"
-    [ "$ST" = ERROR ] && { echo "!! Pod status ERROR"; exit 1; }
-    IP="$(jq -r 'if .status == "RUNNING" then .ssh.direct.host // empty else empty end' <<<"$P")"
-    PORT="$(jq -r 'if .status == "RUNNING" then .ssh.direct.port // empty else empty end' <<<"$P")"
-    [ -n "$IP" ] && [ -n "$PORT" ] && break; sleep 5
-  done
-  [ -n "$IP" ] && [ -n "$PORT" ] || { echo "!! Pod never got a public SSH port"; exit 1; }
+  [ -n "$POD" ] || { echo "   no pod free right now"; exit 2; }
+  [ -n "$(ls "$WORK/todo")" ] || exit 0          # the other pods finished everything meanwhile
   [ -n "$RATE" ] || RATE="$(jq -r '.cost // empty' <<<"$P")"
   local SSHO=(-i "$SSHKEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=10 -o ServerAliveInterval=30)
   rsh() { ssh "${SSHO[@]}" -p "$PORT" "root@$IP" "$@"; }
@@ -153,15 +182,37 @@ run_chunk() { # $1 = chunk number, $2 = first frame, $3 = last frame
   rsh "cat > /root/job/gpu.py" < "$WORK/gpu.py"
   local PRE=""   # optional extra script (e.g. the denoiser, which the phone's Blender lacks)
   if [ -n "${PRE_PY:-}" ]; then rsh "cat > /root/job/pre.py" < "$PRE_PY"; PRE="--python pre.py"; fi
-  local ARGS=""; for x in "${EXTRA[@]}"; do ARGS+=" $(printf '%q' "$x")"; done
-  if [ -n "$FRAME" ]; then ARGS+=" -f $a"; else ARGS+=" -s $a -e $b -a"; fi
-  echo "== Rendering: blender -b scene.blend$ARGS (ready after $(( $(date +%s) - T0 )) s)"
-  rsh "cd /root/job && mkdir -p out && /opt/blender/blender -b scene.blend --python gpu.py $PRE -o /root/job/out/frame_#### $ARGS" 2>&1 \
-    | grep --line-buffered -E "GPU devices|Saved:|Error|error|Time:" || true
-  local N; N="$(rsh 'ls /root/job/out | wc -l')"
-  [ "$N" -gt 0 ] || { echo "!! No frames were rendered"; exit 1; }
-  rsh "cd /root/job/out && tar -cf - ." | tar -xf - -C "$OUT_DIR"
-  echo "== Downloaded $N frames"
+  local ARGS0="" ARGS J a b N; for x in "${EXTRA[@]}"; do ARGS0+=" $(printf '%q' "$x")"; done
+  echo "   ready after $(( $(date +%s) - T0 )) s"
+  while :; do
+    CUR=""
+    for J in $(ls "$WORK/todo" | sort -t_ -k1,1n); do mv "$WORK/todo/$J" "$WORK/claimed/$J" 2>/dev/null && { CUR="$J"; break; }; done
+    [ -n "$CUR" ] || break
+    a="${CUR%_*}"; b="${CUR#*_}"
+    if [ -n "$FRAME" ]; then ARGS="$ARGS0 -f $a"; else ARGS="$ARGS0 -s $a -e $b -a"; fi
+    echo "== Rendering: blender -b scene.blend$ARGS ($(date +%H:%M:%S))"
+    rsh "cd /root/job && rm -rf out && mkdir -p out && /opt/blender/blender -b scene.blend --python gpu.py $PRE -o /root/job/out/frame_#### $ARGS" 2>&1 \
+      | grep --line-buffered -E "GPU devices|Saved:|Error|error|Time:" || true
+    N="$(rsh 'ls /root/job/out | wc -l' || echo 0)"
+    [ "$N" -gt 0 ] || { echo "!! No frames were rendered for $a-$b"; exit 1; }
+    rsh "cd /root/job/out && tar -cf - ." | tar -xf - -C "$OUT_DIR" || { echo "!! Download failed for $a-$b"; exit 1; }
+    mv "$WORK/claimed/$CUR" "$WORK/done/$CUR"; CUR=""
+    echo "== Downloaded $N frames ($a-$b)"
+  done
+}
+
+# A worker keeps trying for a pod (new pod after any failure) until the queue is empty or WAIT_MINUTES pass.
+worker() { # $1 = worker number
+  local n="$1" until=$(( $(date +%s) + ${WAIT_MINUTES:-60} * 60 ))
+  while [ -n "$(ls "$WORK/todo")" ] && [ "$(date +%s)" -lt "$until" ]; do
+    local rc=0; ( run_chunk "$n" ) || rc=$?
+    [ "$rc" = 0 ] && break
+    [ "$rc" = 3 ] && { echo "   API key problem, stopping"; return 0; }
+    [ -n "$(ls "$WORK/todo")" ] || break
+    sleep 30
+  done
+  [ -n "$(ls "$WORK/todo")" ] && echo "   worker $n gave up after ${WAIT_MINUTES:-60} min"
+  return 0
 }
 
 cleanup() {
@@ -175,30 +226,29 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT TERM
 
-echo "== ${#CHUNKS[@]} pod(s), image $IMAGE"
+echo "== $NJOBS job(s) of up to $JOB frames ($NFR frames), up to $PODS pod(s), image $IMAGE"
 T_START=$(date +%s)
-for ((k = 0; k < ${#CHUNKS[@]}; k++)); do
-  read -r a b <<<"${CHUNKS[$k]}"
-  run_chunk "$((k + 1))" "$a" "$b" > "$WORK/chunk$((k + 1)).log" 2>&1 &
+for ((k = 1; k <= PODS; k++)); do
+  worker "$k" > "$WORK/chunk$k.log" 2>&1 &
 done
 
 # Progress every 30 s until all pods are done.
-NFR=0; for c in "${CHUNKS[@]}"; do read -r a b <<<"$c"; NFR=$((NFR + b - a + 1)); done
 while [ -n "$(jobs -rp)" ]; do
   sleep 30
   done_n=$(cat "$WORK"/chunk*.log 2>/dev/null | grep -c '^Saved:' || true)
-  echo "   $(date +%H:%M:%S)  rendered $done_n/$NFR frames"
+  pods_up=$(cat "$WORK"/chunk*.log 2>/dev/null | grep -c '^   ready after' || true); jobs_done=$(ls "$WORK/done" | wc -l)
+  echo "   $(date +%H:%M:%S)  rendered $done_n/$NFR frames, jobs done $jobs_done/$NJOBS, pods started $pods_up"
 done
 wait || true
 
 FAIL=0; SECS=0; DOLLARS=0
-for ((k = 1; k <= ${#CHUNKS[@]}; k++)); do
+for ((k = 1; k <= PODS; k++)); do
   L="$WORK/chunk$k.log"
-  echo "--- pod $k (frames ${CHUNKS[$((k - 1))]})"
-  grep -vE '^(Saved:|Time:|COST)' "$L" | tail -8 | sed 's/^/   /'
-  grep -q '^== Downloaded' "$L" || FAIL=1
-  read -r _ s r < <(grep '^COST' "$L" || echo "COST 0 0")
-  DOLLARS=$(awk -v d="$DOLLARS" -v s="$s" -v r="$r" 'BEGIN{print d + s/3600*r}')
+  echo "--- worker $k"
+  grep -vE '^(Saved:|Time:|COST)|failed \(HTTP' "$L" | tail -8 | sed 's/^/   /'
+  DOLLARS=$(awk -v d="$DOLLARS" '/^COST/ {d += $2/3600*$3} END {print d}' "$L")
 done
+LEFT="$(ls "$WORK/todo" "$WORK/claimed" | grep _ | tr '\n' ' ' || true)"
+[ -z "$LEFT" ] || FAIL=1
 awk -v s=$(( $(date +%s) - T_START )) -v d="$DOLLARS" 'BEGIN{printf "== Total %dm%02ds, about $%.2f\n", s/60, s%60, d}'
-[ "$FAIL" = 0 ] || { echo "!! Some pods failed: their frames are missing. Re-run with -s/-e for those frames."; exit 1; }
+[ "$FAIL" = 0 ] || { echo "!! Jobs not rendered: $LEFT. Run the same command again: frames already here are skipped."; exit 1; }
