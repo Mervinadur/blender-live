@@ -23,7 +23,7 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
 - `claude mcp ...` must run from `~` (it fails elsewhere with "preload not found ./.local/share/claude/setdns.js").
 - I can't see the X11 window. Verify through MCP scene info / dimensions, or render previews to `models/`.
 
-## Status (2026-11-14)
+## Status (2026-11-15)
 - Done: Debian + Blender 4.3.2 + python3-requests installed; blender-mcp 2.0.0 venv at `/opt/blender-mcp`;
   `blender` MCP server registered in Claude Code (user scope, shows Connected); Termux:X11 app installed.
 - 2026-11-14: First live test works. Blender 4.3.2 GUI runs in Termux:X11 on llvmpipe, the add-on opens
@@ -49,5 +49,12 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   ortho_scale 0.16, shift (-0.035, 0.056); Workbench render (MATERIAL colours, so `mat.diffuse_color` is keyed
   along with Base Color), 60 PNGs to `models/mug_gif/` (19 s total), then Termux ffmpeg palettegen/paletteuse → GIF.
   The scene setup is saved in `models/coffee_mug.blend`.
+- 2026-11-15: `models/man-rigged.blend` won't open: it was saved in Blender 5.2 (header `BLENDER17-01v0502`), and 4.3 can't
+  read the new format. No official ARM64 Linux builds of 5.x (blender.org is x64 only, Flathub x86_64 only). Debian forky has
+  blender 5.2.2 for arm64 but needs libc6 >= 2.43, so the whole container would have to move to forky. Offered: a second Debian
+  container upgraded to forky (keeps 4.3 working). **Waiting on the user's decision.**
+- 2026-11-15: Imported `models/astronaut-in-spacesuit-rigged.glb` (glTF works fine in 4.3): char1 mesh 175k verts, 24-bone
+  Armature, actions run_Armature (0-15) and walk_Armature (0-24), plus a stray 2 m Icosphere. Default Cube hidden. Not saved yet.
+  Open .blend files from MCP via `bpy.app.timers.register(...)` around `wm.open_mainfile` (deferred, not inside the socket call).
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
