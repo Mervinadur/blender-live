@@ -76,6 +76,15 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   Don't shorten the bones (changing tails changes rest orientation and breaks the actions). Saved into both astronaut .blend files.
 - 2026-11-15: `models/` sorted into per-model folders (user chose phone-only; `examples/` on GitHub unchanged,
   .blend files not committed). `models/start.log` is the Blender log from my launch command.
-- 2026-11-15: Created empty `models/knight/` (new model folder, user's request); Blender relaunched with the default scene. Nothing modelled yet: waiting on what the user wants the knight to be.
+- 2026-11-15: Knight turntable (**half-done**). User asked: Poly Haven models/HDRI/textures, a bpy setup script, a smooth 360°
+  turntable, a better-quality GIF. Poly Haven has no knight figure; user chose **both side by side**: the chess knight piece from
+  `chess_set` + an armoured knight built from primitives. The add-on's Poly Haven library is off, so `models/knight/fetch_assets.py`
+  (Termux python, Poly Haven public API) downloads into `models/knight/assets/` (79 MB, done): chess_set, kite_shield, antique_estoc
+  (2k glTF), HDRI castle_zavelstein_cellar 2k, textures metal_plate, velour_velvet, marble_01, monastery_stone_floor.
+  `models/knight/setup_scene.py` builds the scene (runs OK): floor, marble pedestal (top parented to `Turntable` empty, linear
+  0→360° over frames 1-120, frame 121 = frame 1), camera `TurntableCam` 50 mm at (0,-6.4,1.75), key + rim area lights, 720×720 PNGs to
+  `models/knight/frames/`. Estoc imports hilt-down (script flips it). Cycles has **no denoiser** in this build; EEVEE Next works.
+  Still to do: check the chess knight faces the camera at frame 1 (rotation -90° is a guess), frame the camera, time a test frame
+  in EEVEE vs Cycles, render, make the GIF (palettegen stats_mode=diff), commit script + GIF to `examples/`.
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
