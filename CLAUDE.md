@@ -28,7 +28,7 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   Add a strength setting (0.5-1.0) so deliberate lighting changes (e.g. a sunset scene) aren't flattened. Test on 2-3 chunks first.
 - `pod-image/`: Dockerfile + start.sh for the RunPod image (Blender 4.3.2, libs, sshd, ffmpeg); built by `.github/workflows/pod-image.yml`.
 - `models/`: the user's working files (gitignored), **one folder per model** (`models/<model-name>/`: .blend, source files,
-  render frames, tests). Currently `coffee-mug/`, `astronaut/`, `man-rigged/`, `knight/`, `nature-trail/`. New model → new folder. Inside Debian: `/root/models/<model-name>/`.
+  render frames, tests). Currently `coffee-mug/`, `astronaut/`, `man-rigged/`, `knight/`, `nature-trail/`, `car-street/`. New model → new folder. Inside Debian: `/root/models/<model-name>/`.
 - `examples/`: finished models committed so the user can download them from GitHub (e.g. `coffee_mug.stl`).
 
 ## Rules
@@ -39,7 +39,7 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
 - `claude mcp ...` must run from `~` (it fails elsewhere with "preload not found ./.local/share/claude/setdns.js").
 - I can't see the X11 window. Verify through MCP scene info / dimensions, or render previews to `models/<model-name>/`.
 
-## Status (2026-11-15)
+## Status (2026-11-16)
 - Done: Debian + Blender 4.3.2 + python3-requests installed; blender-mcp 2.0.0 venv at `/opt/blender-mcp`;
   `blender` MCP server registered in Claude Code (user scope, shows Connected); Termux:X11 app installed.
 - 2026-11-14: First live test works. Blender 4.3.2 GUI runs in Termux:X11 on llvmpipe, the add-on opens
@@ -190,5 +190,23 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   24 GB cards; try 14B for detail.
   Bug fixed after the run: the ssh that starts the pod job hung (stdin not detached) so progress only showed at the end; now `</dev/null`.
   **User verdict:** everything looks right except the colour drift; colour correction is now a required step (see Files). Nothing pending.
+- 2026-11-16: **Car street, step 1 of a stepwise run done (assets + scene set; no animation yet)**. User: car theme, 60 s video,
+  "process optimisation" run = work in steps and report after each. `models/car-street/`: `fetch_assets.py` (Poly Haven CC0: 15
+  street models from the hidden_alley set, rooftop_night 2k HDRI, asphalt_02 / concrete_pavement / brick_wall_02 / concrete_wall_008),
+  `build.py` (headless, 9 s) -> `car_street.blend` (64 MB), `run_headless.sh <script>` (headless Blender with the right binds),
+  `preview.py` (Cycles stills of every camera at 30% to `previews/`; clears marker cameras first, or the frame-1 marker overrides
+  `scene.camera` and every still is the same shot). Layout: street along +Y (y -60..180), road |x|<4, kerb 0.15, sidewalks to |x| 7,
+  random brick/concrete blocks with lit window quads, fenced lot left y 38-58, 25 lamp posts with spot lights, 24 shutter doors +
+  wall lamps, poles/hydrants/benches/bins, barriers + crosswalk at the far end, a covered car parked left at y 101. Damp road
+  (asphalt roughness x0.35). **Hero car = the user's `car.stl`** (added mid-session; 1960s GT coupe, one solid 300k-tri mesh,
+  1.163 long, front at -X, wheels fused): scaled x3.87 to 4.5 m, turned to face +Y, parked on the hero mark (x 1.75, y 92) under a
+  lamp, one red paint material for now. Headlight spots + red tail area light are parented to the `Car` empty. My code-built coupe
+  (loft body + boolean arches, separate spinning wheels) is kept in the excluded `HeroCar_Procedural` collection as a backup.
+  Shots = 5 cameras bound to markers: S1 establish f1, S2 tracking f193, S3 orbit f577, S4 details f961, S5 drive-off f1201
+  (first poses only). Render: EEVEE Next 32 samples, raytracing, motion blur, 1920x1080, 24 fps, 1-1440.
+  Step timings (wall clock): docs + plan ~1 min; asset search + download 40 s (82 MB in 13 s); size probe 7 s; writing build.py
+  ~2.5 min; build 8-9 s; previews 53 s with the code car, 3m20s with the STL car (heavy mesh); STL check ~1.5 min; total ~13 min.
+  **Next (step 2, waiting on the user's go):** colour regions on the STL (glass, chrome, tyres, lights) and split the wheels out by
+  position so they can spin (like the knight), key the drive + the 5 camera moves, then the RunPod render.
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
