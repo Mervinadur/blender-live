@@ -43,6 +43,15 @@ Inputs: `models/<name>/ai_in/f_0001.jpg…` (832x480, 16 fps), plus optional `an
 `prompt.txt` and `negative.txt`. Output: `models/<name>/ai_out.mp4` (1280x720). `CHUNKS=2` makes a ~10 s test.
 First full run (nature trail, 60 s): 66 min, about $0.98. Known issue: colours get stronger chunk after chunk (see CLAUDE.md).
 
+**Shot-based version (car street, 2026-11-17):** `./ai-shots.sh models/<name> "S1,S2,…"` runs a video made of several shots
+on one GPU (or one group of shots per GPU in parallel) and encodes it at the OnePlus 13R's full-screen size (2780×1264).
+Two modes (`SCRIPT=`):
+- `v2v_shots.py` (current): starts from the **real Blender colour render** of your animation and makes it look more real
+  (`--strength` 0.5 keeps it close to Blender, higher = more AI). Your model, layout, colours and camera moves stay.
+- `vace_shots.py`: works from depth only (more invented, came out dark and "too AI" on the car street).
+Both lock colours from chunk to chunk (no more colour drift) and lower the quality steps on their own to fit a time budget
+(`BUDGET=30` minutes). The car street, 60 s: colour render about $0.30, AI pass about $0.53.
+
 ## Limits
 - Renders on the phone use the CPU (software OpenGL), so heavy scenes are slow; see RunPod above.
 - Blender makes meshes. For exact parametric parts for Inventor (STEP), use CAD Agent.
@@ -56,6 +65,11 @@ First full run (nature trail, 60 s): 66 min, about $0.98. Known issue: colours g
   and start again.
 
 ## Examples
+- **Car street** (`models/car-street/`, video not on GitHub, it's on the phone): a red 1960s grand tourer (your `car.stl`)
+  drives down a city street at dusk, stops under a street lamp, the camera circles it, close-ups, then it drives off. 60 s, 6 shots,
+  street set CC0 from [Poly Haven](https://polyhaven.com). `car_street_still.jpg` is one frame of the AI version. Rebuild:
+  `car_street_fetch_assets.py` (assets), `car_street_build.py` (scene; needs your car.stl), `car_street_animate.py` (drive +
+  cameras at 16 fps), `car_street_feed.py` (depth + car-mask feed for the depth-only mode).
 - **`examples/nature_trail.mp4`**: a 1-minute walk along a dirt trail through a meadow with trees, ending at rock cliffs
   (1280×720, 24 fps, 20 MB). The trees sway in the wind and the sun sinks towards golden hour. All models, textures and lighting
   are CC0 from [Poly Haven](https://polyhaven.com). Rendered on 3 rented GPUs at once in 7.5 minutes for about $0.31.

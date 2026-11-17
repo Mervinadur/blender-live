@@ -21,15 +21,54 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   depth control from Depth Anything V2 **Large (CC-BY-NC, non-commercial; switch to Small if the user goes commercial)**.
   Inputs `<model>/ai_in/` (f_*.jpg 832x480 16 fps, anchor.jpg, prompt.txt, negative.txt); outputs `ai_out/`, `ai_out_depth/`
   (re-uploaded on the next run = resume), `ai_out.mp4`. Job runs under nohup on the pod; log has timestamps.
-  **Required step for the next AI animation (user, 2026-11-15): colour correction between chunks. Not built into the code yet;
-  add it to `vace_trail.py` before the next run.** Without it, saturation/contrast grow every chunk (nature trail went neon after ~25 s).
+  **Colour correction between chunks is required (user, 2026-11-15).** Built into `ai/vace_shots.py` and `ai/v2v_shots.py`
+  (2026-11-17); `vace_trail.py` still lacks it. Without it, saturation/contrast grow every chunk (nature trail went neon after ~25 s).
   Method: before each chunk k>0, colour-match the 8 overlap frames to the reference look (anchor.jpg, or chunk 0's frames) with
   per-channel mean/std transfer in LAB (Reinhard), then feed them to VACE; apply the same match to every saved output frame.
   Add a strength setting (0.5-1.0) so deliberate lighting changes (e.g. a sunset scene) aren't flattened. Test on 2-3 chunks first.
+- `ai-shots.sh`: shot-based AI video on 1..N pods (one group of shots per pod, in parallel), via `ai-remote.sh` with
+  `SCRIPT`/`ARGS`/`ENCODE=0`/`TAG`; fills missing frames, encodes to `FINAL` (default 2780x1264 = OnePlus 13R full screen).
+  Env: SCRIPT (vace_shots.py | v2v_shots.py), STEPS, BUDGET (min of generation), SIZE (960x432), EXTRA_ARGS (`--offload`
+  required on a 4090, `--strength`), MAX_MINUTES (55).
+- `ai/v2v_shots.py`: **current route.** Wan 2.1 T2V 1.3B video-to-video from the Blender colour render (`ai_in/render/`),
+  `--strength` (0.5 = close to Blender), colour locked to the render per chunk (`--cc-render`, car mask/background apart),
+  matched + cross-faded on chunk overlaps (`--cc`), auto-fit steps to `--budget-min`.
+- `ai/vace_shots.py`: depth-only route (Blender Z feed + car mask, one generated car reference via VACE `reference_images`,
+  masked colour correction, auto-fit). v1 of car-street: user found it too dark and "too AI".
 - `pod-image/`: Dockerfile + start.sh for the RunPod image (Blender 4.3.2, libs, sshd, ffmpeg); built by `.github/workflows/pod-image.yml`.
 - `models/`: the user's working files (gitignored), **one folder per model** (`models/<model-name>/`: .blend, source files,
-  render frames, tests). Currently `coffee-mug/`, `astronaut/`, `man-rigged/`, `knight/`, `nature-trail/`, `car-street/`. New model → new folder. Inside Debian: `/root/models/<model-name>/`.
+  render frames, tests). Currently `coffee-mug/`, `astronaut/`, `man-rigged/`, `knight/`, `nature-trail/`, `car-street/` (car-street: `ai_in/` feed + prompts, `remote_frames/` raw EEVEE render, `ai_out/` v2 frames, `ai_out_2780x1264.mp4` v2, `ai_out_v1_2780x1264.mp4` v1, `ai_logs/`). New model → new folder. Inside Debian: `/root/models/<model-name>/`.
 - `examples/`: finished models committed so the user can download them from GitHub (e.g. `coffee_mug.stl`).
+
+## AI video runs: recipe and lessons (read before the next video)
+Learned on nature-trail and car-street (2026-11-15..17). `models/car-street/` is the reference implementation.
+1. **Steps, reported to the user after each:** (a) assets + scene (`fetch_assets.py`, `build.py`, headless via
+   `run_headless.sh`); (b) motion (`animate.py`, keyed straight at 16 fps = Wan rate, shots ending on chunk starts);
+   (c) **the user checks motion by pressing Space in the live X11 Blender** (timeline set, `sync_mode=FRAME_DROP`,
+   overlays off); roughest preview first, never a long render to "show" motion; (d) colour render on a pod; (e) Wan on a pod;
+   (f) encode on the phone.
+2. **Route = video-to-video from the Blender colour render** (`v2v_shots.py`). The user: "the animation model should not be
+   disregarded". Depth-only VACE invents too much (v1: dark, black-void background, "too AI"). Strength 0.5 + render lock 0.6
+   stayed CGI-looking; next try 0.65-0.7 and `--cc-render 0.3`.
+3. **Render settings for the AI feed:** EEVEE **16 samples** (user's choice; 64 = ~1 frame/s on a 4090), 960x432 (= Wan
+   size; 2.2:1 = OnePlus 13R 2780x1264 shape; larger is wasted, smaller loses detail). Final encode Lanczos to 2780x1264, 16 fps.
+4. **Render on the pod, not the phone** (user, 2026-11-17): the phone feed took 59 min; next time render on the same pod as Wan
+   (not built yet). EEVEE on the pod is **much brighter** than the phone's Cycles preview: check one frame per shot before Wan;
+   grade with ffmpeg if needed (car-street v2 dusk grade is in its Status entry).
+5. **Shots = chunk boundaries;** a shot's first chunk must never reach into the previous shot (fixed in v2v_shots.py).
+6. **Colour correction stays on** even with depth/render input: drift comes from chunks continuing from generated overlap frames.
+7. **GPU:** 4090 needs `--offload` (all-on-GPU OOMs at 81 frames, $0.09 lost). Speeds with offload, 960x432, 81 frames:
+   v2v 28 steps x 0.5 = ~103 s/chunk; VACE 12 steps = ~131 s/chunk. 60 s = 15 chunks. Setup ~5-10 min (pip + model download).
+   COMMUNITY 4090 $0.34/h vs SECURE $0.89/h. RunPod "high memory 86%" = page cache (harmless); disk 80 GB = $0.011/h (normal).
+8. **Budget:** the user caps AI generation at ~30 min on **one pod**; the scripts auto-lower steps to fit (`--budget-min`).
+9. **Costs so far (car-street):** v1 VACE $0.32 (incl. OOM try); v2 colour render $0.30 + Wan $0.53.
+10. **Token economy (user asked, 2026-11-17):** don't watch runs chunk by chunk (each wake-up re-reads the whole session).
+    Plan: one `make-video.sh` end-to-end script + `termux-notification` at the end; at most one completion notification;
+    fresh Claude session per video (this file has the state); Sonnet for routine runs. **Not built yet.**
+11. **Live Blender:** long blocking MCP calls time out ("No data received") -> render with a `bpy.app.timers` loop (one frame per
+    tick). Headless Workbench/EEVEE hangs on EGL unless X11 runs; headless scene building (no GL) is fine.
+12. Known bug: the ssh that starts the pod job still hangs, so local progress shows nothing until the job ends (the job runs
+    fine; read `/workspace/job/log.txt` on the pod).
 
 ## Rules
 - The add-on's generation integrations (Hyper3D/Rodin, Tripo, Meshy, World Labs, Sketchfab) stay **off**.
@@ -39,7 +78,7 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
 - `claude mcp ...` must run from `~` (it fails elsewhere with "preload not found ./.local/share/claude/setdns.js").
 - I can't see the X11 window. Verify through MCP scene info / dimensions, or render previews to `models/<model-name>/`.
 
-## Status (2026-11-16)
+## Status (2026-11-17)
 - Done: Debian + Blender 4.3.2 + python3-requests installed; blender-mcp 2.0.0 venv at `/opt/blender-mcp`;
   `blender` MCP server registered in Claude Code (user scope, shows Connected); Termux:X11 app installed.
 - 2026-11-14: First live test works. Blender 4.3.2 GUI runs in Termux:X11 on llvmpipe, the add-on opens
@@ -254,5 +293,8 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   **Agreed for the next run:** feed/colour render ON the Wan pod; EEVEE 16 samples (`animate.py` already set); one
   `make-video.sh` end-to-end script + `termux-notification` at the end, so Claude isn't woken per chunk (token cost);
   fresh session per video. **Waiting on the user's verdict of v2.**
+- 2026-11-17: Housekeeping (user): deleted stale feed tests (`feed/`, `feed_rough/`), empty `ai_out_depth/`, `.blend1` backups,
+  one-off probes (probe.py, probe_stl.py, look_stl.py) and v1's PNG frames (505 MB); kept v1 refs in `ai_in/ref_v1/` and both mp4s.
+  Scripts copied to `examples/car_street_*.py` + `car_street_still.jpg` (mp4s not pushed, user's choice). README updated.
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
