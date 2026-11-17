@@ -40,7 +40,10 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   render frames, tests). Currently `coffee-mug/`, `astronaut/`, `man-rigged/`, `knight/`, `nature-trail/`, `car-street/`, `robot-scene/` (car-street: `ai_in/` feed + prompts, `remote_frames/` raw EEVEE render, `ai_out/` v2 frames, `ai_out_2780x1264.mp4` v2, `ai_out_v1_2780x1264.mp4` v1, `ai_logs/`). New model → new folder. Inside Debian: `/root/models/<model-name>/`.
 - `examples/`: finished models committed so the user can download them from GitHub (e.g. `coffee_mug.stl`).
 
-## AI video runs: recipe and lessons (read before the next video)
+## AI video runs: recipe and lessons (**DROPPED 2026-11-17, kept as history**)
+**The user dropped the Wan/AI pass entirely (2026-11-17): "the ROI is low and I think blender is perfect".** Videos are now
+Blender only: build in steps, user checks motion in X11, colour render on a RunPod pod (`render-remote.sh`), encode on the
+phone. Don't propose Wan/v2v runs again unless the user brings it back. Everything below is history.
 Learned on nature-trail and car-street (2026-11-15..17). `models/car-street/` is the reference implementation.
 1. **Steps, reported to the user after each:** (a) assets + scene (`fetch_assets.py`, `build.py`, headless via
    `run_headless.sh`); (b) motion (`animate.py`, keyed straight at 16 fps = Wan rate, shots ending on chunk starts);
@@ -340,6 +343,13 @@ Learned on nature-trail and car-street (2026-11-15..17). `models/car-street/` is
   17m25s, $0.08): stills nearly identical to Blender at all three (softer, more photographic); old sweep kept in `ai_out_sweep1/`,
   `sample_compare_sweep1.mp4`. **Waiting on the user: strength + which shots get AI**, then: full render on a pod -> Wan on the
   picked shots -> stitch.sh.
+  **Final, 2026-11-17: Blender only.** Full colour render on a 4090 (`render-remote.sh -a`, EEVEE 16, 960x432, 960 frames)
+  13m28s, $0.10 -> `remote_frames/` -> `final_blender_2780x1264.mp4` (60 s, 16 fps, Lanczos to the OnePlus 13R screen, 79 MB,
+  built with `ai/stitch.sh <model> none_`). The hybrid Wan run (shots 2/4/5 at 0.45/0.35/0.35) never finished: try 1 lost the
+  phone's network mid-upload and the trap couldn't delete the pod (DNS down; I deleted it by hand, $0.26 lost -> `bye()` in
+  ai-remote.sh now retries the delete 20x); try 2's upload finished but the ssh never closed (known hang), so I started the job
+  by hand, then **the user dropped Wan** and the pod was deleted (no pods left). Robot scene is **done**. Leftovers (phone only,
+  ~470 MB): `ai_out_sweep1/`, `ai_out_sweep2/`, `sample_*.mp4`, `ai_in/` (user to say whether to delete).
   Not done: colour render + Wan (steps d-f).
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.

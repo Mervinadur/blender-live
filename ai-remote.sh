@@ -29,7 +29,9 @@ SSHO=(-i "$SSHKEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -
 mkdir -p "$OUT"
 POD=""; T0=""; RATE=""
 el() { echo "[$(date +%H:%M:%S) +$(( $(date +%s) - ${T0:-$(date +%s)} ))s]"; }   # stage timestamps (since pod created)
-bye() { [ -n "$POD" ] && api -X DELETE "$API/pods/$POD" >/dev/null && echo "== Pod $POD deleted"
+bye() { if [ -n "$POD" ]; then   # retry: a network drop once left a pod billing (2026-11-17, DNS failed during the delete)
+          for i in $(seq 1 20); do api -X DELETE "$API/pods/$POD" >/dev/null 2>&1 && { echo "== Pod $POD deleted"; break; }
+            echo "   delete failed (network?), retry $i/20 in 15 s"; sleep 15; done; fi
         [ -n "$T0" ] && awk -v s=$(( $(date +%s) - T0 )) -v r="${RATE:-0}" 'BEGIN{printf "== Pod time %dm%02ds, about $%.2f\n", s/60, s%60, s/3600*r}'; }
 trap bye EXIT; trap 'exit 130' INT TERM
 

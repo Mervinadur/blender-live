@@ -36,6 +36,9 @@ It prints the time and rough cost at the end (the knight turntable, 120 frames, 
 Your .blend (with its textures packed in) is uploaded to RunPod for the render.
 
 ## Making a render look real (self-hosted AI, no Replicate)
+> **Dropped 2026-11-17:** the Wan AI pass is no longer used (low return; the Blender render alone looks better, see the
+> robot scene). The scripts below stay in the repo for reference only.
+
 `./ai-remote.sh models/<name>` rents one RTX 4090 on RunPod and runs the open-source **Wan 2.1 VACE** video model
 (Apache 2.0) on your Blender walk-through. Each frame follows the scene's depth (Depth Anything V2), so the layout stays
 the same as in Blender, and each ~5 s chunk carries on from the end of the one before, so there are no cuts.
