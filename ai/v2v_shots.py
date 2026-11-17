@@ -22,6 +22,8 @@ ap.add_argument("--seed", type=int, default=42); ap.add_argument("--size", defau
 ap.add_argument("--cc", type=float, default=0.8); ap.add_argument("--cc-render", type=float, default=0.6)
 ap.add_argument("--budget-min", type=float, default=30.0); ap.add_argument("--min-steps", type=int, default=10)
 ap.add_argument("--offload", action="store_true")
+ap.add_argument("--edge-ramp", type=int, default=8)   # frames at each shot start/end blended from pure render (0 AI at the cut) to full AI
+ap.add_argument("--min-shot", type=int, default=33)   # shots shorter than this pass the Blender render through (no AI)
 ap.add_argument("--sweep", default="")   # "0.5:0.5,0.65:0.35" = strength:cc_render variants, model loaded once -> o_s050_####.png
 a = ap.parse_args()
 W, H = map(int, a.size.split("x")); N = 81
@@ -96,7 +98,8 @@ def chunk_plan(f0, f1):
         if s + n - 1 > f1:
             n = f1 - s + 1
             if k == 0: n -= (n - 1) % 4               # first chunk must not reach into the previous shot: shrink to 4k+1
-            else: n += (1 - n) % 4; s = f1 - n + 1    # later chunks grow back into their own shot (more overlap)
+            else:                                     # later chunks grow back into their shot; no tiny tail chunk, never past the cut
+                n += (1 - n) % 4; n = min(max(n, 33), f1 - f0 + 1); n -= (n - 1) % 4; s = f1 - n + 1
         out.append((k, start, s, n)); start, k = s + n, k + 1
     return out
 
@@ -106,7 +109,12 @@ BUDGET_ALL = a.budget_min
 for a.strength, a.cc_render in VARIANTS:
     if a.sweep: PREFIX = f"o_s{round(a.strength * 100):03d}_"; a.budget_min = BUDGET_ALL / len(VARIANTS)
     log(f"== variant strength {a.strength} cc_render {a.cc_render} -> {PREFIX}####.png")
-    plan = [(sh, c) for sh in todo for c in chunk_plan(sh["f0"], sh["f1"])]
+    for sh in todo:                                   # short shots: Blender render as is (Wan smears/hallucinates on them)
+        if sh["f1"] - sh["f0"] + 1 < a.min_shot or sh.get("strength", 1) == 0:
+            for f in range(sh["f0"], sh["f1"] + 1): rimg(f).save(opath(f))
+            log(f"shot {sh['name']}: Blender render passed through (strength 0 or < {a.min_shot} frames)")
+    ai_shot = lambda sh: sh["f1"] - sh["f0"] + 1 >= a.min_shot and sh.get("strength", 1) != 0
+    plan = [(sh, c) for sh in todo if ai_shot(sh) for c in chunk_plan(sh["f0"], sh["f1"])]
     left = sum(1 for sh, (k, st, s, n) in plan if not all(os.path.exists(opath(f)) for f in range(st, s + n)))
     log(f"{left} chunks to generate, budget {a.budget_min:.0f} min")
     steps, sec_per_step, gen_time = a.steps, None, 0.0
@@ -123,7 +131,7 @@ for a.strength, a.cc_render in VARIANTS:
         src = [rimg(f) for f in frames]
         t0 = time.time()
         out = pipe(video=src, prompt=BASE + ", " + sh["prompt"], negative_prompt=NEG, height=H, width=W,
-                   num_inference_steps=steps, strength=a.strength, guidance_scale=a.cfg,
+                   num_inference_steps=steps, strength=sh.get("strength", a.strength), guidance_scale=a.cfg,
                    generator=torch.Generator("cpu").manual_seed(a.seed), output_type="pil").frames[0]
         dt = time.time() - t0; gen_time += dt; left -= 1
         eff = max(1, int(steps * a.strength))
@@ -144,4 +152,17 @@ for a.strength, a.cc_render in VARIANTS:
             Image.fromarray(to_rgb8(labs[i])).save(opath(f))
         log(f"  chunk {k}: frames {start}-{e} ({n} frames, overlap {keep}) in {dt:.0f} s, {steps} steps x {a.strength} "
             f"(gen total {gen_time / 60:.1f} min)")
+    # 0 AI at every cut: blend the first/last --edge-ramp frames of each shot from the pure render up to the AI output
+    done_flag = os.path.join(a.out, f"{PREFIX}ramp_done")
+    if a.edge_ramp > 0 and not os.path.exists(done_flag):
+        R = a.edge_ramp
+        for sh in todo:
+            if not ai_shot(sh): continue
+            for f in range(sh["f0"], sh["f1"] + 1):
+                w = min(1.0, (f - sh["f0"] + 1) / (R + 1), (sh["f1"] - f + 1) / (R + 1))
+                if w < 1.0:
+                    ai = np.asarray(Image.open(opath(f)).convert("RGB"), np.float32)
+                    rd_ = np.asarray(rimg(f), np.float32)
+                    Image.fromarray((rd_ * (1 - w) + ai * w + 0.5).astype(np.uint8)).save(opath(f))
+        open(done_flag, "w").close(); log(f"edge ramp {R} frames applied")
     log(f"ALL DONE, generation {gen_time / 60:.1f} min")

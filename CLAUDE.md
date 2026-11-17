@@ -331,6 +331,15 @@ Learned on nature-trail and car-street (2026-11-15..17). `models/car-street/` is
   alley s050 ~ Blender, s065 = real-looking walls/asphalt with robot + layout kept, s080 drifts (robot smeared, props lost,
   a phantom second figure). Suggested: 0.65 overall, or per shot (close-ups ~0.75, wides ~0.6). **Waiting on the user's pick**
   before the full 60 s run (est. render ~$0.10 + Wan ~35 min ~ $0.65 on an L40S).
+  **User verdict on sweep 1:** cuts smear / heavy hallucination; the Blender render already looks great (GLB models with real
+  textures, unlike the car STL) -> wants < 0.5, 0 AI on short bits, and **hand-picked shots** for AI, stitched with pure render.
+  v2v_shots.py: `--edge-ramp 8` (each AI shot starts/ends on the pure render, AI faded in/out over 8 frames, so cuts are clean),
+  `--min-shot 33` (shorter shots pass the render through), tail chunks >= 33 frames and never past the cut (unit-checked on all
+  robot-scene shots), per-shot `"strength"` in shots.json (0 = Blender only). New `ai/stitch.sh <model> [prefix] [WxH]`: AI frames
+  where present, render frames elsewhere -> `final_2780x1264.mp4`. Sweep 2 (0.25:0.6, 0.35:0.6, 0.45:0.5; 4090 COMMUNITY $0.34/h,
+  17m25s, $0.08): stills nearly identical to Blender at all three (softer, more photographic); old sweep kept in `ai_out_sweep1/`,
+  `sample_compare_sweep1.mp4`. **Waiting on the user: strength + which shots get AI**, then: full render on a pod -> Wan on the
+  picked shots -> stitch.sh.
   Not done: colour render + Wan (steps d-f).
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
