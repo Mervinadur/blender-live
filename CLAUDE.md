@@ -384,5 +384,10 @@ Learned on nature-trail and car-street (2026-11-15..17). `models/car-street/` is
   brightness fine, no grade needed (`test_small.jpg`; 15m22s incl. pod setup, ~$0.13). **Full render started**
   (`PODS=3 JOB=124`, log `remote_full.log`) -> `remote_frames/` -> `tow_pup_assembly_2780x1264.mp4` (24 fps, crf 18) + phone
   notification. If it was cut off: re-run the same command (frames already downloaded are skipped).
+- 2026-11-17: **Tow Pup render done**: 744 frames, 3 pods (4090 SECURE x2 + others as they freed up; one 4090 had no public IP
+  and was swapped), 18m35s, ~$0.64 -> `remote_frames/` -> `tow_pup_assembly_2780x1264.mp4` (31 s, 24 fps, crf 18, 32 MB).
+  **BGM added** via ~/audio-generator: Scott Buckley "Machina" (CC BY 4.0) from 178 s, so its lift (~200-205 s) lands on
+  6_Reveal; fade 1.5 s in / 3 s out -> `tow_pup_assembly_audio_2780x1264.mp4`; credit in `audio/CREDITS.txt`.
+  **Waiting on the user's watch/listen.** Lesson: Python downloader stalled on Wikimedia again; curl with the API URL worked.
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
