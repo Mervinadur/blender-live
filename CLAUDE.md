@@ -320,6 +320,8 @@ Learned on nature-trail and car-street (2026-11-15..17). `models/car-street/` is
   the camera sits at (-16.45,-42.1,1.5), lens 65), 3_Robot1_Alley 257-384 (old dolly, 8 s), 4_Robot2_Crossroads, 5_Robot3_Lot,
   6_Finale. X11 set-up for the user (the user can't scroll the timeline sideways): timeline `action.view_all` via temp_override so all 6 markers
   fit; 3D overlays on with only `show_text` (shows the shot/camera name), everything else off.
+  v5: 2_Robot1_CloseUp no longer locked (user: too static): slow pan across the face (truck 0.4 m, aim 0.24 m) + ~2 cm
+  handheld sway (layered sines). User approved the timeline set-up ("looks perfect").
   Not done: colour render + Wan (steps d-f).
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
