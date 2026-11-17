@@ -377,5 +377,12 @@ Learned on nature-trail and car-street (2026-11-15..17). `models/car-street/` is
   `start-blender.sh`, kill old copies **by PID**. (2) Never put the X11 server's name in a Bash command line that also runs
   start-blender.sh: its `pkill -f` pattern matches the calling shell and kills it (exit 144). (3) Splash turned off in user prefs
   (`show_splash=False`, saved).
+- 2026-11-17: **Tow Pup realistic look + RunPod render (user approved the motion: "perfect").** assemble.py now adds: Poly Haven
+  CC0 `kloofendal_48d_partly_cloudy_puresky_2k.hdr` (tow-pup/assets/hdri), sun 3.5 (angle 1.5 deg), 400 m concrete_pavement floor
+  (3 m tiles, copied to tow-pup/assets/textures), CAD metals set metallic (steel 0.45, aluminium 0.32, polished 0.12 rough),
+  EEVEE Next 32 samples + raytracing + motion blur, AgX Medium High Contrast, 2780x1264 PNG. Test frame 700 on a 4090:
+  brightness fine, no grade needed (`test_small.jpg`; 15m22s incl. pod setup, ~$0.13). **Full render started**
+  (`PODS=3 JOB=124`, log `remote_full.log`) -> `remote_frames/` -> `tow_pup_assembly_2780x1264.mp4` (24 fps, crf 18) + phone
+  notification. If it was cut off: re-run the same command (frames already downloaded are skipped).
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
