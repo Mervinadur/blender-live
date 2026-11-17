@@ -3,3 +3,4 @@ models/
 install.log
 *.blend1
 cpuinfo-nosve
+__pycache__/
