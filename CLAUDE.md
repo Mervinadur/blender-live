@@ -206,7 +206,35 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   (first poses only). Render: EEVEE Next 32 samples, raytracing, motion blur, 1920x1080, 24 fps, 1-1440.
   Step timings (wall clock): docs + plan ~1 min; asset search + download 40 s (82 MB in 13 s); size probe 7 s; writing build.py
   ~2.5 min; build 8-9 s; previews 53 s with the code car, 3m20s with the STL car (heavy mesh); STL check ~1.5 min; total ~13 min.
-  **Next (step 2, waiting on the user's go):** colour regions on the STL (glass, chrome, tyres, lights) and split the wheels out by
-  position so they can spin (like the knight), key the drive + the 5 camera moves, then the RunPod render.
+  Step 2 changed by the user (2026-11-17): **AI route, not a polished Blender render** (nature-trail lesson: Wan repaints every
+  pixel, so detailed animation/materials are overkill). Only depth + object coherence are needed:
+  - `animate.py` -> `car_street_anim.blend`: car drive + 6 camera moves keyed at **16 fps, 1-960** (S1 1-128, S2 129-384,
+    S3 385-640, S4 641-720, S4b 721-800, S5 801-960; shots end on chunk starts). Car: y -55 -> stop at 92 (t 24 s) -> 152.
+    User checked it by pressing Space in X11: fixed S1 (car too small -> camera y 10-12, 50 mm) and a doubled lamp at the hero mark.
+  - `feed.py` -> `ai_in/depth/d_####.png` (Blender Z as disparity, fixed near/far per shot = no flicker; no Depth Anything)
+    + `ai_in/mask/m_####.png` (car silhouette), 1056x480. **Workbench needs the live X11 Blender**: headless it hangs on EGL
+    (twice). Run it inside the live Blender with a `bpy.app.timers` loop (one frame per tick): a long blocking MCP call times
+    out ("No data received"). ~2.1 s/frame, ~33 min for 960. `ENGINE=CYCLES` = CPU fallback without a display (untested).
+  - `ai/vace_shots.py` (new): per-shot chunks, one generated car reference (frame 509 side view, fixed seed) passed to every
+    chunk via VACE `reference_images`; **colour correction built in** (per-chunk Reinhard in LAB, car mask and background
+    separately, later chunks locked to the shot's first chunk, car pulled to the reference; unit-tested locally); budget
+    `--budget-min 30` with auto-fit (lowers steps, min 12, after measuring chunk speed); model on GPU (no cpu offload).
+    `ai-remote.sh` got `SCRIPT`/`ARGS`/`ENCODE`/`TAG` and per-run temp dirs; `ai-shots.sh` (new) runs shot groups on 1..N pods,
+    fills gaps and encodes to **2780x1264 (OnePlus 13R full screen)**. User chose **one pod**: 960x432 gen (2.2:1), 16 steps.
+  - `ai_in/` also holds shots.json (per-shot prompts), prompt.txt, negative.txt, ref_frame.txt.
+  **Next run (user agreed 2026-11-17): render the feed ON the Wan pod** (install Blender 4.3.2 there, upload the .blend,
+  render depth + mask headless on the GPU in ~1-3 min, then Wan) instead of ~33 min on the phone. Phone = scene build +
+  the user's X11 motion check only. Untested: output paths (feed.py writes to /root/models/...; make OUT an argument).
+  **Run done 2026-11-17:** `models/car-street/ai_out_2780x1264.mp4` (60 s, 960 frames, 16 fps, 2780x1264, 76 MB, phone only;
+  frames `ai_out/o_*.png`, car reference `ai_out/ref_car.png` / `ref_full.png`, logs `ai_logs/`).
+  Timings: feed on the phone 59 min (2.1-7 s/frame, the wide S5 shots slowest). Pod try 1: **OOM** with the model all on the
+  4090 (24 GB) at the first 81-frame chunk, after the reference was made: 5m51s, $0.09. Try 2 with `--offload`: 4090 COMMUNITY
+  $0.34/h, 40m29s, $0.23 (setup ~10 min, generation 28.5 min, auto-fit went to the 12-step minimum: 131 s per 81-frame chunk,
+  download 43 s); encode ~2 min. Total pod cost $0.32.
+  Bugs found: the ssh that starts the pod job still hangs (`</dev/null` didn't fix it), so local progress shows nothing until
+  the job ends (the job itself runs fine; read the pod log directly). ai-shots.sh encoded with 0 frames (now exits).
+  First look (contact sheet): the car is consistent across shots (deep red classic coupe, chrome, wire wheels), but the video is
+  **much darker** than the reference, and in the tracking shot the background is a black void (car floating). Likely causes:
+  dark disparity range for the street behind the car, the night prompt, 12 steps. **Waiting on the user's verdict.**
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
