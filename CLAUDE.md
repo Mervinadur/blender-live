@@ -354,5 +354,14 @@ Learned on nature-trail and car-street (2026-11-15..17). `models/car-street/` is
 - 2026-11-17: **Robot scene audio (BGM only)** via ~/audio-generator: `models/robot-scene/final_audio_2780x1264.mp4`
   (Scott Buckley "The Long Dark", CC BY 3.0, credit in `audio/CREDITS.txt`). Waiting on the user's listen; more audio later.
   Audio files live in `models/<name>/audio/`; see ~/audio-generator/CLAUDE.md.
+- 2026-11-17: **Tow Pup exploded view: built, waiting on the user's X11 check** (`models/tow-pup/`, local only since models/ is
+  gitignored). User GLB `tow_pup.glb` (renamed from "22000L Tow Pup.glb"): Inventor assembly export, metres, 11.5 m long, Y = length,
+  89 root assemblies, ~1160 part meshes (457 unique, ~770k unique tris), 136 materials, small textures. `build.py` is run **inside the
+  live X11 Blender** (user: headless fails) via MCP `exec(open("/root/models/tow-pup/build.py").read())`, ~10 s ->
+  `tow_pup_explode.blend`. Explosion follows the assembly tree: each EMPTY child moves by (child centre - parent centre) x K[level],
+  K = 0.7/0.9/1.1; parts are never split. 24 fps, 1-360: hold, levels 0/1/2 out (25-84/85-144/145-204), hold, all back 265-336.
+  Camera on `CamRig`, 90 deg linear orbit, dist = 0.8 x exploded size. X11 set: camera view, Solid + material colours, overlays off.
+  Known weak spot: the big tank shell barely moves (it sits at the centre); small bits fly furthest. Next: user's feedback, then
+  colour render on a pod (render-remote.sh) + encode.
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
