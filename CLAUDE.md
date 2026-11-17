@@ -363,5 +363,19 @@ Learned on nature-trail and car-street (2026-11-15..17). `models/car-street/` is
   Camera on `CamRig`, 90 deg linear orbit, dist = 0.8 x exploded size. X11 set: camera view, Solid + material colours, overlays off.
   Known weak spot: the big tank shell barely moves (it sits at the centre); small bits fly furthest. Next: user's feedback, then
   colour render on a pod (render-remote.sh) + encode.
+- 2026-11-17: **Tow Pup assembly film (user: "all parts getting assembled from scratch", multiple *moving* shots, timeline
+  shows every shot tag): built, waiting on the user's X11 check.** `models/tow-pup/assemble.py` (run inside the live X11 Blender via
+  MCP `exec(open(...).read())`, ~15 s) -> `tow_pup_assemble.blend`. Stage starts empty; each unit (Inventor tree node) is hidden
+  (keyed hide_viewport/hide_render) until its turn, then flies 16 frames in from outside (ease-out), big units first, hardware last.
+  24 fps, 1-744: 1_Chassis (241 units) | 2_Axles 169 (3 axle sets + 24 loose wheel roots 10069842/10071196) | 3_Rear 289 (12) |
+  4_Tank 385 (32 shell pieces from above) | 5_Fittings 529 (155) | 6_Reveal 625 (120 deg orbit). One camera per shot, bound to a
+  marker; every camera arcs 70-80 deg around a pivot with radius/height changing (v1 had small straight drifts and the user said
+  "all the shots are stationary"). Floor plane + sun + grey world. X11: camera view, overlays only show_text, timeline view_all.
+  The older one-shot explode (`build.py` -> `tow_pup_explode.blend`) is kept.
+  **Lessons:** (1) `pgrep -a blender` shows nothing (proot); use `top -b -n1 | grep 'blender --python'`. Four Blender copies had piled
+  up from restarts; the oldest (dead window) held port 9876, so MCP calls hung while the user saw a different Blender. Before
+  `start-blender.sh`, kill old copies **by PID**. (2) Never put the X11 server's name in a Bash command line that also runs
+  start-blender.sh: its `pkill -f` pattern matches the calling shell and kills it (exit 144). (3) Splash turned off in user prefs
+  (`show_splash=False`, saved).
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
