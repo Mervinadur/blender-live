@@ -37,7 +37,7 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   masked colour correction, auto-fit). v1 of car-street: user found it too dark and "too AI".
 - `pod-image/`: Dockerfile + start.sh for the RunPod image (Blender 4.3.2, libs, sshd, ffmpeg); built by `.github/workflows/pod-image.yml`.
 - `models/`: the user's working files (gitignored), **one folder per model** (`models/<model-name>/`: .blend, source files,
-  render frames, tests). Currently `coffee-mug/`, `astronaut/`, `man-rigged/`, `knight/`, `nature-trail/`, `car-street/` (car-street: `ai_in/` feed + prompts, `remote_frames/` raw EEVEE render, `ai_out/` v2 frames, `ai_out_2780x1264.mp4` v2, `ai_out_v1_2780x1264.mp4` v1, `ai_logs/`). New model → new folder. Inside Debian: `/root/models/<model-name>/`.
+  render frames, tests). Currently `coffee-mug/`, `astronaut/`, `man-rigged/`, `knight/`, `nature-trail/`, `car-street/`, `robot-scene/` (car-street: `ai_in/` feed + prompts, `remote_frames/` raw EEVEE render, `ai_out/` v2 frames, `ai_out_2780x1264.mp4` v2, `ai_out_v1_2780x1264.mp4` v1, `ai_logs/`). New model → new folder. Inside Debian: `/root/models/<model-name>/`.
 - `examples/`: finished models committed so the user can download them from GitHub (e.g. `coffee_mug.stl`).
 
 ## AI video runs: recipe and lessons (read before the next video)
@@ -296,5 +296,16 @@ Learned on nature-trail and car-street (2026-11-15..17). `models/car-street/` is
 - 2026-11-17: Housekeeping (user): deleted stale feed tests (`feed/`, `feed_rough/`), empty `ai_out_depth/`, `.blend1` backups,
   one-off probes (probe.py, probe_stl.py, look_stl.py) and v1's PNG frames (505 MB); kept v1 refs in `ai_in/ref_v1/` and both mp4s.
   Scripts copied to `examples/car_street_*.py` + `car_street_still.jpg` (mp4s not pushed, user's choice). README updated.
+- 2026-11-17: **Robot scene, steps (a)+(b) done, waiting on the user's X11 motion check** (`models/robot-scene/`). User added
+  5 Pixellabs GLBs (static meshes, ~1 unit tall, 50k tris, 4K PBR, no rigs): 3 robots (3347, robot-3332, 3393; front = -Y) and
+  2 abandoned houses (3642, 3643). `build.py` (headless, ~7 s) -> `robot_scene.blend` (236 MB, textures packed): robots 2.3/2.6/2.3 m
+  in a row at y~0, houses 8.5/8 m behind; dressing (user asked mid-session: reuse our assets / Poly Haven) = car-street asphalt,
+  pavement slabs, brick/concrete backdrop + side blocks, props (barriers, tyres, barrels, boxes, trash bags, lamps, poles, covered
+  car, utility box) + nature-trail trunk, boulders, 160 grass clumps, loaded in place from `../car-street/assets` and
+  `../nature-trail/assets`; new HDRI `sunset_jhbcentral` 2k (`fetch_assets.py`) + warm low sun. Props kept off the camera path.
+  Camera `RunCam`: one continuous move, 16 fps, 1-960 (no cuts): P1 0-8 s high approach, P2 8-24 s dolly in, P3 24-40 s orbit
+  (r 5.8-7.5), P4 40-50 s slide past the faces, P5 50-60 s rise + pull back. Each phase eases to a stop at its joins (may feel
+  like pauses; switch to linear if the user says so). Live X11 Blender has it open: camera view, overlays off, Solid + texture
+  colours, FRAME_DROP. Not done: colour render + Wan (steps d-f). `look` frame strips take >2 min on llvmpipe; user said don't render.
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
