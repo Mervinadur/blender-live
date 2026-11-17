@@ -351,5 +351,8 @@ Learned on nature-trail and car-street (2026-11-15..17). `models/car-street/` is
   by hand, then **the user dropped Wan** and the pod was deleted (no pods left). Robot scene is **done; the user approved the final render (2026-11-17).** Wan leftovers (sweeps, samples,
   ai_in/, ai_logs/) deleted on the user's OK; kept: `remote_frames/` (the final's Blender frames), scene files, previews.
   Not done: colour render + Wan (steps d-f).
+- 2026-11-17: **Robot scene audio (BGM only)** via ~/audio-generator: `models/robot-scene/final_audio_2780x1264.mp4`
+  (Scott Buckley "The Long Dark", CC BY 3.0, credit in `audio/CREDITS.txt`). Waiting on the user's listen; more audio later.
+  Audio files live in `models/<name>/audio/`; see ~/audio-generator/CLAUDE.md.
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
