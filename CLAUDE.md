@@ -235,6 +235,24 @@ blender-mcp 2.0.0 from PyPI; Termux's `uv` is visible in Debian but is a Termux 
   the job ends (the job itself runs fine; read the pod log directly). ai-shots.sh encoded with 0 frames (now exits).
   First look (contact sheet): the car is consistent across shots (deep red classic coupe, chrome, wire wheels), but the video is
   **much darker** than the reference, and in the tracking shot the background is a black void (car floating). Likely causes:
-  dark disparity range for the street behind the car, the night prompt, 12 steps. **Waiting on the user's verdict.**
+  dark disparity range for the street behind the car, the night prompt, 12 steps. **User verdict: too dark, "too much AI",
+  and the Blender animation model must not be disregarded.** v1 kept as `ai_out_v1/`, `ai_out_v1_2780x1264.mp4`.
+- 2026-11-17: **Car street v2 = video-to-video** (`ai/v2v_shots.py`, Wan 2.1 T2V 1.3B `WanVideoToVideoPipeline`): each chunk
+  starts from the Blender **colour render** (SDEdit `--strength 0.5`), so the model/layout/colours stay; per chunk colour
+  locked to the render (`--cc-render 0.6`, car/background separately) and matched + cross-faded to the previous chunk on the
+  overlap. STL car now has material regions (`build.py` `car_regions`: glass, chrome bumpers + wire wheels, tyres, head/tail
+  lights, underbody, by face position; measured with `probe_regions.py`). Scene brighter (HDRI 1.2, exposure +1, headlights 6).
+  Colour render on RunPod via `render-remote.sh` (EEVEE 64 samples, raytracing, 960x432): 21m40s, $0.30, ~1 frame/s.
+  EEVEE came out much brighter than the Cycles phone preview (overcast-day look), so the frames were graded on the phone to dusk
+  (ffmpeg `eq=gamma=0.78:brightness=-0.04:saturation=0.92,colorbalance=bs=0.10:bm=0.05:rs=-0.04:rm=-0.02:rh=0.03`) into
+  `ai_in/render/`. Wan pod: 4090 SECURE $0.89/h, 36 min, $0.53, generation 22.2 min at full 28 steps x 0.5 (~103 s per
+  81-frame chunk with offload). RunPod showed "high memory 86%": that's page cache (124 GB pod, job used 32 GB), harmless.
+  Output `ai_out_2780x1264.mp4` (87 MB). First look (contact sheet): very close to the Blender render, still CGI-looking
+  (strength 0.5 + render lock 0.6 kept too much). Next if the user wants more realism: strength 0.65-0.7, `--cc-render 0.3`.
+  Bug fixed after the run: a short shot's first chunk (80 frames -> 81) reached 1 frame into the previous shot and was matched
+  to it (S4, S4b). ssh job-start still hangs (remote `< /dev/null` added, not enough); the job runs fine.
+  **Agreed for the next run:** feed/colour render ON the Wan pod; EEVEE 16 samples (`animate.py` already set); one
+  `make-video.sh` end-to-end script + `termux-notification` at the end, so Claude isn't woken per chunk (token cost);
+  fresh session per video. **Waiting on the user's verdict of v2.**
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.

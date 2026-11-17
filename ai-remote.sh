@@ -73,7 +73,7 @@ else RUN="python $SCRIPT --feed ai_in --out out --model $MODEL --steps $STEPS $A
 rsh "cd /workspace/job && nohup bash -c 'export HF_HUB_ENABLE_HF_TRANSFER=1 HF_HOME=/workspace/hf; echo pip start \$(date +%T)
   pip install -q torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cu124 &&
   pip install -q diffusers==0.35.1 transformers==4.56.1 accelerate==1.10.1 ftfy sentencepiece hf_transfer imageio-ffmpeg && echo pip done \$(date +%T) &&
-  $RUN; echo EXIT \$?' > log.txt 2>&1 &"  </dev/null
+  $RUN; echo EXIT \$?' > log.txt 2>&1 < /dev/null &"  </dev/null
 
 # 3. Follow the log every minute until the job finishes, then pull the frames.
 pull() { rsh "cd /workspace/job && tar -cf - out out_depth 2>/dev/null" | tar -xf - -C "$M/.ai_tmp_$$" 2>/dev/null || true

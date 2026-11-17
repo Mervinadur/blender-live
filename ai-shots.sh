@@ -9,7 +9,8 @@
 # Output: <model>/ai_out/o_*.png, per-pod logs <model>/ai_logs/pod*.log, then <model>/ai_out_<WxH>.mp4.
 # Env: STEPS (16, auto-lowered to fit), BUDGET (30 = minutes of generation per pod), SIZE (960x432 = 2.2:1),
 #      FINAL (2780x1264 = OnePlus 13R full screen), MAX_MINUTES (55, pod self-delete), GPUS / CLOUD as in ai-remote.sh,
-#      EXTRA_ARGS (more vace_shots.py args; "--offload" is needed on 24 GB cards: the full model OOMs on a 4090).
+#      EXTRA_ARGS (more script args; "--offload" is needed on 24 GB cards: the full model OOMs on a 4090),
+#      SCRIPT (vace_shots.py = depth-only VACE; v2v_shots.py = video-to-video from the Blender colour render in ai_in/render/).
 set -uo pipefail
 case "${1:-}" in ""|-h|--help) sed -n '2,11p' "$0"; exit;; esac
 DIR="$HOME/blender-live"; M="$(realpath "$1")"; shift
@@ -18,7 +19,7 @@ export MAX_MINUTES="${MAX_MINUTES:-55}"
 mkdir -p "$M/ai_logs" "$M/ai_out"; T0=$(date +%s); PIDS=(); i=0
 for g in "$@"; do
   i=$((i + 1))
-  SCRIPT=vace_shots.py ENCODE=0 TAG="-$i" STEPS="$STEPS" ARGS="--shots $g --size $SIZE --budget-min $BUDGET ${EXTRA_ARGS:-}" \
+  SCRIPT="${SCRIPT:-vace_shots.py}" ENCODE=0 TAG="-$i" STEPS="$STEPS" ARGS="--shots $g --size $SIZE --budget-min $BUDGET ${EXTRA_ARGS:-}" \
     "$DIR/ai-remote.sh" "$M" > "$M/ai_logs/pod$i.log" 2>&1 &
   PIDS+=($!); echo "pod$i: $g (log ai_logs/pod$i.log)"; sleep 5
 done
