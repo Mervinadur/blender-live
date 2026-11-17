@@ -322,6 +322,15 @@ Learned on nature-trail and car-street (2026-11-15..17). `models/car-street/` is
   fit; 3D overlays on with only `show_text` (shows the shot/camera name), everything else off.
   v5: 2_Robot1_CloseUp no longer locked (user: too static): slow pan across the face (truck 0.4 m, aim 0.24 m) + ~2 cm
   handheld sway (layered sines). User approved the timeline set-up ("looks perfect").
+  **10 s sweet-spot sample done 2026-11-17** (frames 129-288 = 2_CloseUp + first 2 s of 3_Alley): colour render on a 4090 via
+  render-remote.sh (EEVEE 16, 960x432) 2m28s $0.04, no grade needed (`remote_frames/` -> `ai_in/render/`); prompts in `ai_in/`
+  (no masks: v2v_shots.py now treats a missing mask as "no subject"). Wan v2v sweep on ONE pod (new `--sweep strength:cc_render,...`,
+  model loaded once, files `ai_out/o_s050_####.png` etc.): 0.5:0.5, 0.65:0.35, 0.8:0.2, 28 steps, --offload, L40S SECURE $1.09/h,
+  22m20s, $0.41 (setup ~7 min; ~4-5 min generation per 10 s variant). Outputs: `sample_compare.mp4` (2x2 Blender/s050/s065/s080)
+  + `sample_s0X0_2780x1264.mp4`. My read: close-up holds at all strengths (more rust detail as strength rises); in the wide
+  alley s050 ~ Blender, s065 = real-looking walls/asphalt with robot + layout kept, s080 drifts (robot smeared, props lost,
+  a phantom second figure). Suggested: 0.65 overall, or per shot (close-ups ~0.75, wides ~0.6). **Waiting on the user's pick**
+  before the full 60 s run (est. render ~$0.10 + Wan ~35 min ~ $0.65 on an L40S).
   Not done: colour render + Wan (steps d-f).
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
