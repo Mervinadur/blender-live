@@ -315,6 +315,11 @@ Learned on nature-trail and car-street (2026-11-15..17). `models/car-street/` is
   Every instance: random variant (tall_bias), mirror, width x0.85-1.2, height x0.92-1.18, and a per-instance tint (Object Info
   Random -> Hue/Sat/Value on the house material; render only, Solid view shows plain textures). Second row of houses at |x| ~20
   (mostly tall) fills the empty pavement; ~85 house instances. S5 camera centred on the street. Previews: `previews/sheet.jpg`.
+  v4 (user): shots renamed with numbers, now 6: 1_City 1-128, **2_Robot1_CloseUp 129-256 = locked camera on the eyes**
+  (user: stationary close-up for curiosity; also fixes the S1->S2 jerk; Robot_1's face points more south than its body, so
+  the camera sits at (-16.45,-42.1,1.5), lens 65), 3_Robot1_Alley 257-384 (old dolly, 8 s), 4_Robot2_Crossroads, 5_Robot3_Lot,
+  6_Finale. X11 set-up for the user (the user can't scroll the timeline sideways): timeline `action.view_all` via temp_override so all 6 markers
+  fit; 3D overlays on with only `show_text` (shows the shot/camera name), everything else off.
   Not done: colour render + Wan (steps d-f).
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
