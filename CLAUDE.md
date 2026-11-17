@@ -310,6 +310,11 @@ Learned on nature-trail and car-street (2026-11-15..17). `models/car-street/` is
   at the crossroads and blocked S3). Shots (one camera each, bound to markers, 16 fps): S1 city 1-128, S2 Robot_1 alley 129-384,
   S3 Robot_2 half-orbit 385-640, S4 Robot_3 lot push-in 641-832, S5 crane up the street 833-960. Known: empty pavement at the far
   edges of S1/S5 (fix = a second row of houses, costs viewport speed). User rule: **start X11 Blender whenever working on scenes.**
+  v3 (user: building variations, must not feel like 2 buildings): each house GLB is bisected into ground / middle / roof bands
+  (A cut at 0.30/0.62 h, B at 0.33/0.66 h) and re-stacked: base, tall (A +2 middles = 14 m, B +1 = 10.7 m), short (no middle).
+  Every instance: random variant (tall_bias), mirror, width x0.85-1.2, height x0.92-1.18, and a per-instance tint (Object Info
+  Random -> Hue/Sat/Value on the house material; render only, Solid view shows plain textures). Second row of houses at |x| ~20
+  (mostly tall) fills the empty pavement; ~85 house instances. S5 camera centred on the street. Previews: `previews/sheet.jpg`.
   Not done: colour render + Wan (steps d-f).
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
