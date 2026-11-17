@@ -348,8 +348,8 @@ Learned on nature-trail and car-street (2026-11-15..17). `models/car-street/` is
   built with `ai/stitch.sh <model> none_`). The hybrid Wan run (shots 2/4/5 at 0.45/0.35/0.35) never finished: try 1 lost the
   phone's network mid-upload and the trap couldn't delete the pod (DNS down; I deleted it by hand, $0.26 lost -> `bye()` in
   ai-remote.sh now retries the delete 20x); try 2's upload finished but the ssh never closed (known hang), so I started the job
-  by hand, then **the user dropped Wan** and the pod was deleted (no pods left). Robot scene is **done**. Leftovers (phone only,
-  ~470 MB): `ai_out_sweep1/`, `ai_out_sweep2/`, `sample_*.mp4`, `ai_in/` (user to say whether to delete).
+  by hand, then **the user dropped Wan** and the pod was deleted (no pods left). Robot scene is **done**. Wan leftovers (sweeps, samples,
+  ai_in/, ai_logs/) deleted on the user's OK; kept: `remote_frames/` (the final's Blender frames), scene files, previews.
   Not done: colour render + Wan (steps d-f).
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
