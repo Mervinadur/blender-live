@@ -389,5 +389,8 @@ Learned on nature-trail and car-street (2026-11-15..17). `models/car-street/` is
   **BGM added** via ~/audio-generator: Scott Buckley "Machina" (CC BY 4.0) from 178 s, so its lift (~200-205 s) lands on
   6_Reveal; fade 1.5 s in / 3 s out -> `tow_pup_assembly_audio_2780x1264.mp4`; credit in `audio/CREDITS.txt`.
   **Waiting on the user's watch/listen.** Lesson: Python downloader stalled on Wikimedia again; curl with the API URL worked.
+- 2026-11-18: **Dodge game sprites** (`models/dodge-sprites/`): `build_sprites.py` run in the live X11 Blender via MCP exec builds a
+  `Sprites` scene (rocket, 3 asteroids) and renders Workbench transparent PNGs (+ numpy starfield/flame) to `out/` in ~10 s; copied
+  into the Godot project (`/storage/emulated/0/godot/mygame/startgame/assets/sprites/`, repo godot-games, script copy in its `art/`).
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
