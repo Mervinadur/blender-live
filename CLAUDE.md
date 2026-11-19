@@ -394,3 +394,7 @@ Learned on nature-trail and car-street (2026-11-15..17). `models/car-street/` is
   into the Godot project (`/storage/emulated/0/godot/mygame/startgame/assets/sprites/`, repo godot-games, script copy in its `art/`).
 - Not yet known: how usable the UI feels on llvmpipe (I can't see the screen; ask the user).
 - Later: GPU rendering (zink + turnip) instead of llvmpipe.
+- 2026-11-19: **Werewolf for Godot 3DWolf** (`models/werewolf/`, from the user's `~/Werewolf.blend`, Rigify-style rig, no clips):
+  `anim.py` keys idle/walk/run/jump/fall/climb on the rig controls -> `werewolf_anim.blend`; `export.py` -> `out/werewolf.glb`
+  (deform bones only) + `out/tex/`; `check.py` measures feet/hands. Headless via `./run_headless.sh <script>` (no GL needed).
+  Details in the godot-games CLAUDE.md (3DWolf). Asset is from a commercial game: private use only.
