@@ -398,3 +398,7 @@ Learned on nature-trail and car-street (2026-11-15..17). `models/car-street/` is
   `anim.py` keys idle/walk/run/jump/fall/climb on the rig controls -> `werewolf_anim.blend`; `export.py` -> `out/werewolf.glb`
   (deform bones only) + `out/tex/`; `check.py` measures feet/hands. Headless via `./run_headless.sh <script>` (no GL needed).
   Details in the godot-games CLAUDE.md (3DWolf). Asset is from a commercial game: private use only.
+- 2026-11-20: **CadQuery runs on the phone** inside Debian: venv `/opt/cadquery` (cadquery 2.8.0, OCP aarch64 wheel for
+  Python 3.13). Used for the 3DWolf castle (`models/castle/stl/`, pipeline in the godot-games CLAUDE.md). Castle previews:
+  `models/werewolf/castle_*.png` (headless Cycles via `models/werewolf/castle_preview.py`). Note: right after a proot render,
+  Termux's PIL sometimes can't read the new PNG for a moment; retry.
